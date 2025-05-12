@@ -1,0 +1,41 @@
+﻿namespace Network.Messages;
+
+public class NetPingBroadcast : IMessage<(int, float)[]>
+{
+    public (int, float)[] Data { get; set; }
+
+    public MessageType GetMessageType()
+    {
+        return MessageType.PingBroadcast;
+    }
+
+    public byte[] Serialize()
+    {
+        if (Data == null || Data.Length == 0) throw new ArgumentException("Data is null or empty");
+
+        var size = Data.Length * sizeof(float);
+        var message = new byte[size];
+        Buffer.BlockCopy(Data, 0, message, 0, size);
+        return message;
+    }
+
+    public (int, float)[] Deserialize(byte[] message)
+    {
+        if (message == null || message.Length == 0) throw new ArgumentException("Message is null or empty");
+
+        var size = message.Length / (sizeof(int) + sizeof(float));
+        var data = new (int, float)[size];
+        Buffer.BlockCopy(message, 0, data, 0, message.Length);
+        return data;
+    }
+
+    public byte[] Serialize((int, float)[] newData)
+    {
+        if (newData == null || newData.Length == 0) throw new ArgumentException("Data is null or empty");
+
+        var size = newData.Length * sizeof(float);
+        var message = new byte[size];
+        Buffer.BlockCopy(newData, 0, message, 0, size);
+        return message;
+    }
+}
