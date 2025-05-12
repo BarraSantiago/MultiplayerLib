@@ -6,12 +6,10 @@ public class PlayerManager
 {
     private readonly ConcurrentDictionary<int, int> _playerColor = new();
     private readonly ConcurrentDictionary<int, Controller> _playerControllers = new();
-    private readonly GameObject _playerPrefab;
     private readonly ConcurrentDictionary<int, GameObject> _players = new();
 
-    public PlayerManager(GameObject playerPrefab)
+    public PlayerManager()
     {
-        _playerPrefab = playerPrefab;
     }
 
     public bool HasPlayer(int clientId)

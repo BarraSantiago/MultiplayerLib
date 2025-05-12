@@ -1,9 +1,11 @@
 ﻿using System.Net;
+using Network;
 using Network.ClientDir;
+using Network.interfaces;
 using Network.Messages;
 using Utils;
 
-namespace Network.interfaces;
+namespace MultiplayerLib.Network.interfaces;
 
 public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNetworkManager>, IReceiveData, IDisposable
 {
@@ -13,7 +15,6 @@ public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNe
     protected bool _disposed;
     protected BaseMessageDispatcher _messageDispatcher;
     protected PlayerManager _playerManager;
-    [SerializeField] protected GameObject PlayerPrefab;
 
     public int Port { get; protected set; }
 
@@ -53,7 +54,7 @@ public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNe
     protected virtual void Awake()
     {
         _clientManager = new ClientManager();
-        _playerManager = new PlayerManager(PlayerPrefab);
+        _playerManager = new PlayerManager();
     }
 
     public virtual void SendMessage(byte[] data, IPEndPoint ipEndPoint)

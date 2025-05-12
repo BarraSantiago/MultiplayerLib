@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Numerics;
 using Network.Factory;
 using Network.interfaces;
 using Network.Messages;
@@ -35,7 +36,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         {
             if (arg1 == null || arg1.Length < 4)
             {
-                Console.WriteLineError("[ClientMessageDispatcher] Invalid ping broadcast data");
+                Console.WriteLine("[ClientMessageDispatcher] Invalid ping broadcast data");
                 return;
             }
 
@@ -48,7 +49,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLineError($"[ClientMessageDispatcher] Error in HandlePingBroadcast: {ex.Message}");
+            Console.WriteLine($"[ClientMessageDispatcher] Error in HandlePingBroadcast: {ex.Message}");
         }
     }
 
@@ -110,8 +111,8 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            _currentLatency = (Time.realtimeSinceStartup - _lastPing) * 1000;
-            _lastPing = Time.realtimeSinceStartup;
+            _currentLatency = (DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond - _lastPing) * 1000;
+            _lastPing = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;;
 
             OnSendToServer?.Invoke(null, MessageType.Ping, false);
         }

@@ -1,4 +1,5 @@
-﻿using Network.Factory;
+﻿using System.Numerics;
+using Network.Factory;
 
 namespace Network.Messages;
 
@@ -16,12 +17,12 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
         var serializedData = new List<byte>();
         serializedData.AddRange(BitConverter.GetBytes(data.NetworkId));
         serializedData.AddRange(BitConverter.GetBytes((int)data.PrefabType));
-        serializedData.AddRange(BitConverter.GetBytes(data.Position.x));
-        serializedData.AddRange(BitConverter.GetBytes(data.Position.y));
-        serializedData.AddRange(BitConverter.GetBytes(data.Position.z));
-        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.x));
-        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.y));
-        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.z));
+        serializedData.AddRange(BitConverter.GetBytes(data.Position.X));
+        serializedData.AddRange(BitConverter.GetBytes(data.Position.Y));
+        serializedData.AddRange(BitConverter.GetBytes(data.Position.Z));
+        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.X));
+        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.Y));
+        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.Z));
         serializedData.AddRange(BitConverter.GetBytes(data.Color));
 
         return serializedData.ToArray();
@@ -54,12 +55,12 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
         var serializedData = new List<byte>();
         serializedData.AddRange(BitConverter.GetBytes(newData.NetworkId));
         serializedData.AddRange(BitConverter.GetBytes((int)newData.PrefabType));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Position.x));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Position.y));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Position.z));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.x));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.y));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.z));
+        serializedData.AddRange(BitConverter.GetBytes(newData.Position.X));
+        serializedData.AddRange(BitConverter.GetBytes(newData.Position.Y));
+        serializedData.AddRange(BitConverter.GetBytes(newData.Position.Z));
+        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.X));
+        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.Y));
+        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.Z));
         serializedData.AddRange(BitConverter.GetBytes(newData.Color));
 
         return serializedData.ToArray();

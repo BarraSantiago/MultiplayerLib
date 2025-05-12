@@ -37,7 +37,7 @@ public class ClientManager
         if (_ipToId.TryGetValue(endpoint, out var client)) return client;
 
         var id = _clientIdCounter++;
-        var newClient = new Client(endpoint, id, Time.realtimeSinceStartup);
+        var newClient = new Client(endpoint, id, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
 
         _ipToId[endpoint] = id;
         _clients[id] = newClient;
@@ -63,13 +63,13 @@ public class ClientManager
     public void UpdateClientTimestamp(int clientId)
     {
         if (!_clients.TryGetValue(clientId, out var client)) return;
-        client.LastHeartbeatTime = Time.realtimeSinceStartup;
+        client.LastHeartbeatTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
         _clients[clientId] = client;
     }
 
     public List<IPEndPoint> GetTimedOutClients(float timeout)
     {
-        float currentTime = Time.realtimeSinceStartup;
+        float currentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
         var timedOut = new List<IPEndPoint>();
 
         foreach (var client in _clients)

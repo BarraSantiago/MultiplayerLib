@@ -1,4 +1,6 @@
-﻿namespace Network.Messages;
+﻿using System.Numerics;
+
+namespace Network.Messages;
 
 public class NetVector3 : IMessage<Vector3>
 {
@@ -18,11 +20,11 @@ public class NetVector3 : IMessage<Vector3>
 
     public Vector3 Deserialize(byte[] message)
     {
-        Vector3 outData;
+        Vector3 outData = new Vector3();
 
-        outData.x = BitConverter.ToSingle(message, 4);
-        outData.y = BitConverter.ToSingle(message, 8);
-        outData.z = BitConverter.ToSingle(message, 12);
+        outData.X = BitConverter.ToSingle(message, 4);
+        outData.Y = BitConverter.ToSingle(message, 8);
+        outData.Z = BitConverter.ToSingle(message, 12);
 
         return outData;
     }
@@ -37,9 +39,9 @@ public class NetVector3 : IMessage<Vector3>
         var outData = new List<byte>();
 
         outData.AddRange(BitConverter.GetBytes(id));
-        outData.AddRange(BitConverter.GetBytes(_data.x));
-        outData.AddRange(BitConverter.GetBytes(_data.y));
-        outData.AddRange(BitConverter.GetBytes(_data.z));
+        outData.AddRange(BitConverter.GetBytes(_data.X));
+        outData.AddRange(BitConverter.GetBytes(_data.Y));
+        outData.AddRange(BitConverter.GetBytes(_data.Z));
 
         return outData.ToArray();
     }
@@ -54,9 +56,9 @@ public class NetVector3 : IMessage<Vector3>
         var outData = new List<byte>();
 
         outData.AddRange(BitConverter.GetBytes(id));
-        outData.AddRange(BitConverter.GetBytes(newData.x));
-        outData.AddRange(BitConverter.GetBytes(newData.y));
-        outData.AddRange(BitConverter.GetBytes(newData.z));
+        outData.AddRange(BitConverter.GetBytes(newData.X));
+        outData.AddRange(BitConverter.GetBytes(newData.Y));
+        outData.AddRange(BitConverter.GetBytes(newData.Z));
 
         return outData.ToArray();
     }

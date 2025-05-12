@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Numerics;
 
 namespace Network.Messages;
 
@@ -26,9 +27,9 @@ public class NetPlayers : IMessage<Dictionary<int, Vector3>>
         {
             outData.AddRange(BitConverter.GetBytes(kvp.Key));
             Vector3 position = kvp.Value.transform.position;
-            outData.AddRange(BitConverter.GetBytes(position.x));
-            outData.AddRange(BitConverter.GetBytes(position.y));
-            outData.AddRange(BitConverter.GetBytes(position.z));
+            outData.AddRange(BitConverter.GetBytes(position.X));
+            outData.AddRange(BitConverter.GetBytes(position.Y));
+            outData.AddRange(BitConverter.GetBytes(position.Z));
         }
 
         return outData.ToArray();
@@ -68,9 +69,9 @@ public class NetPlayers : IMessage<Dictionary<int, Vector3>>
 
         outData.AddRange(BitConverter.GetBytes(1));
         outData.AddRange(BitConverter.GetBytes(id));
-        outData.AddRange(BitConverter.GetBytes(pos.x));
-        outData.AddRange(BitConverter.GetBytes(pos.y));
-        outData.AddRange(BitConverter.GetBytes(pos.z));
+        outData.AddRange(BitConverter.GetBytes(pos.X));
+        outData.AddRange(BitConverter.GetBytes(pos.Y));
+        outData.AddRange(BitConverter.GetBytes(pos.Z));
 
         return outData.ToArray();
     }

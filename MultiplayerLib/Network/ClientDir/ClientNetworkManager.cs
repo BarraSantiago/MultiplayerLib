@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using MultiplayerLib.Network.interfaces;
 using Network.interfaces;
 using Network.Messages;
 
@@ -13,14 +14,14 @@ public struct PlayerData
 public class ClientNetworkManager : AbstractNetworkManager
 {
     private IPEndPoint _serverEndpoint;
-    [SerializeField] private TMP_Text heartbeatText;
+    //TODO update ms text
+    //[SerializeField] private TMP_Text heartbeatText;
 
     public IPAddress ServerIPAddress { get; private set; }
 
 
     public void StartClient(IPAddress ip, int port, string pName, int color)
     {
-        heartbeatText = GameObject.FindGameObjectsWithTag("Ping").FirstOrDefault()?.GetComponent<TMP_Text>();
         ServerIPAddress = ip;
         Port = port;
 
@@ -85,11 +86,6 @@ public class ClientNetworkManager : AbstractNetworkManager
     protected override void Update()
     {
         base.Update();
-
-        if (_disposed) return;
-
-        if (heartbeatText && _messageDispatcher != null)
-            heartbeatText.text = $"Ping: {_messageDispatcher.CurrentLatency:F0} ms";
     }
 
     public override void Dispose()

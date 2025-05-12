@@ -1,13 +1,14 @@
-﻿using Network.Messages;
+﻿using System.Numerics;
+using Network.Messages;
 
 namespace Network.Factory;
 
-public abstract class NetworkObject : MonoBehaviour
+public abstract class NetworkObject
 {
     public int NetworkId { get; private set; } = -1;
     public bool IsOwner { get; private set; }
     public NetObjectTypes PrefabType { get; set; } = NetObjectTypes.None;
-    public Vector3 LastUpdatedPos { get; set; } = Vector3.zero;
+    public Vector3 LastUpdatedPos { get; set; } = Vector3.Zero;
 
     public virtual void Initialize(int networkId, bool isOwner, NetObjectTypes prefabType)
     {

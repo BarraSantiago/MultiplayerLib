@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using MultiplayerLib.Network.interfaces;
 using Network.Factory;
 using Network.interfaces;
 using Network.Messages;

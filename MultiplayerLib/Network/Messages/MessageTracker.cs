@@ -27,7 +27,7 @@ public class MessageTracker
             Data = data,
             MessageType = type,
             MessageNumber = number,
-            LastSentTime = Time.realtimeSinceStartup
+            LastSentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond
         };
     }
 
@@ -40,7 +40,7 @@ public class MessageTracker
     {
         if (_pendingMessages.TryGetValue(target, out var messages) &&
             messages.TryGetValue((type, number), out var message))
-            message.LastSentTime = Time.realtimeSinceStartup;
+            message.LastSentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
     }
 
     public Dictionary<IPEndPoint, List<PendingMessage>> GetPendingMessages()
