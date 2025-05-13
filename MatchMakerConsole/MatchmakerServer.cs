@@ -18,9 +18,8 @@ public enum MessageType
 
 public class MatchmakerServer
 {
-    private readonly Dictionary<int, GameServer> _activeServers = new();
+    private readonly Dictionary<int, Process> _activeServers = new();
 
-    // State
     private readonly Dictionary<IPEndPoint, Client> _connectedClients = new();
     private readonly string _gameServerPath;
     private readonly bool _isRunning = true;
@@ -28,7 +27,6 @@ public class MatchmakerServer
 
     private readonly int _playersPerServer;
 
-    // Configuration
     private readonly int _port;
     private readonly int _startingPort;
     private readonly UdpClient _udpClient;
@@ -128,10 +126,11 @@ public class MatchmakerServer
         }
 
         // Create new client
-        Client client = new Client(clientEndPoint, _nextClientId++, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond)
-        {
-            Name = name
-        };
+        Client client =
+            new Client(clientEndPoint, _nextClientId++, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond)
+            {
+                Name = name
+            };
 
         _connectedClients[clientEndPoint] = client;
         _usedNames.Add(name);
@@ -170,7 +169,11 @@ public class MatchmakerServer
     {
         try
         {
-            byte[] typeBytes = BitConverter.GetBytes((int)MessageType.Console
+            //TODO send console message
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending console message: {ex.Message}");
         }
     }
 
@@ -178,10 +181,9 @@ public class MatchmakerServer
     {
         try
         {
-            // Setup process start info
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
-                FileName = gameServerExecutablePath,
+                FileName = _gameServerPath,
                 Arguments = $"-port {port} -serverId {serverId}",
                 UseShellExecute = false,
                 CreateNoWindow = false
