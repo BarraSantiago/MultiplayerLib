@@ -11,10 +11,10 @@ public class NetHandShake : IMessage<PlayerData>
     {
         PlayerData outData;
 
-        var offset = 0;
+        int offset = 0;
         outData.Color = BitConverter.ToInt32(message, offset);
         offset += 4;
-        var stringLength = BitConverter.ToInt32(message, offset);
+        int stringLength = BitConverter.ToInt32(message, offset);
         offset += 4;
 
         outData.Name = Encoding.UTF8.GetString(message, offset, stringLength);
@@ -30,10 +30,10 @@ public class NetHandShake : IMessage<PlayerData>
     // TODO Cliente: color, nombre Servidor: Seed, Players
     public byte[] Serialize()
     {
-        var outData = new List<byte>();
+        List<byte> outData = new List<byte>();
 
         outData.AddRange(BitConverter.GetBytes(_data.Color));
-        var stringBytes = Encoding.UTF8.GetBytes(_data.Name);
+        byte[] stringBytes = Encoding.UTF8.GetBytes(_data.Name);
         outData.AddRange(BitConverter.GetBytes(stringBytes.Length));
         outData.AddRange(stringBytes);
 
@@ -42,10 +42,10 @@ public class NetHandShake : IMessage<PlayerData>
 
     public byte[] Serialize(PlayerData playerData)
     {
-        var outData = new List<byte>();
+        List<byte> outData = new List<byte>();
 
         outData.AddRange(BitConverter.GetBytes(playerData.Color));
-        var stringBytes = Encoding.UTF8.GetBytes(playerData.Name);
+        byte[] stringBytes = Encoding.UTF8.GetBytes(playerData.Name);
         outData.AddRange(BitConverter.GetBytes(stringBytes.Length));
         outData.AddRange(stringBytes);
 

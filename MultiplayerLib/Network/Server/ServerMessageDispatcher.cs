@@ -1,15 +1,18 @@
 ﻿using System.Net;
+using System.Numerics;
+using MultiplayerLib.Game;
+using MultiplayerLib.Network.Factory;
+using Network;
 using Network.ClientDir;
-using Network.Factory;
 using Network.interfaces;
 using Network.Messages;
 
-namespace Network.Server;
+namespace MultiplayerLib.Network.Server;
 
-public class ServerMessageDispatcher : BaseMessageDispatcher
+public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 {
-    public ServerMessageDispatcher(PlayerManager playerManager, UdpConnection connection, ClientManager clientManager)
-        : base(playerManager, connection, clientManager)
+    public ServerMessageDispatcher(UdpConnection connection, ClientManager clientManager)
+        : base(connection, clientManager)
     {
     }
 
@@ -30,9 +33,9 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
 
     private void HandleDisconnect(byte[] arg1, IPEndPoint arg2)
     {
-        if (!_clientManager.TryGetClientId(arg2, out var clientId))
+        if (!_clientManager.TryGetClientId(arg2, out int clientId))
         {
-            Console.WriteLineWarning($"[ServerMessageDispatcher] Disconnect from unknown client {arg2}");
+            Console.WriteLine($"[ServerMessageDispatcher] Disconnect from unknown client {arg2}");
             return;
         }
 
@@ -43,8 +46,8 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
 
     private void HandleAcknowledgment(byte[] arg1, IPEndPoint arg2)
     {
-        var ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
-        var ackedNumber = BitConverter.ToInt32(arg1, 4);
+        MessageType ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
+        int ackedNumber = BitConverter.ToInt32(arg1, 4);
 
         MessageTracker.ConfirmMessage(arg2, ackedType, ackedNumber);
     }
@@ -54,25 +57,27 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            var networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
-            var clientId = _clientManager.AddClient(ip);
-            var pData = _netHandShake.Deserialize(data);
-            GameObject player = CreateNetworkObject(Vector3.zero, Vector3.zero, NetObjectTypes.Player, pData.Color)
-                .gameObject;
+            Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
+            int clientId = _clientManager.AddClient(ip);
+            PlayerData pData = _netHandShake.Deserialize(data);
+            ClientColor[clientId] = pData.Color;
+            CreateNetworkObject(Vector3.Zero,NetObjectTypes.Player, pData.Color);
 
-            _playerManager.CreatePlayer(clientId, player);
             _clientManager.UpdateClientTimestamp(clientId);
 
-            var newId = BitConverter.GetBytes((int)MessageType.Id).ToList();
+            List<byte> newId = BitConverter.GetBytes((int)MessageType.Id).ToList();
             newId.AddRange(BitConverter.GetBytes(clientId));
             _connection.Send(newId.ToArray(), ip);
 
-            ServerNetworkManager.OnSerializedBroadcast.Invoke(player.transform.position, MessageType.HandShake,
-                clientId);
-
-            _netPlayers.Data = _playerManager.GetAllPlayers();
+            ServerNetworkManager.OnSerializedBroadcast.Invoke(Vector3.Zero, MessageType.HandShake, clientId);
+            Dictionary<int, Vector3> players = new Dictionary<int, Vector3>();
+            foreach (NetworkObject netObj in NetworkObjectFactory.Instance.GetAllNetworkObjects().Values)
+            {
+                players.Add(netObj.NetworkId, netObj.CurrentPos);
+            }
+            _netPlayers.Data = players;
             SendObjectsToClient(ip, networkObjects);
-            var msg = ConvertToEnvelope(_netPlayers.Serialize(), MessageType.HandShake, ip, true);
+            byte[] msg = ConvertToEnvelope(_netPlayers.Serialize(), MessageType.HandShake, ip, true);
             _connection.Send(msg, ip);
 
 
@@ -86,21 +91,20 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
 
     private void SendObjectsToClient(IPEndPoint ip, Dictionary<int, NetworkObject> networkObjects)
     {
-        foreach (var kvp in networkObjects)
+        foreach (KeyValuePair<int, NetworkObject> kvp in networkObjects)
         {
-            var networkObject = kvp.Value;
+            NetworkObject? networkObject = kvp.Value;
             if (networkObject == null) continue;
 
-            var createMsg = new NetworkObjectCreateMessage
+            NetworkObjectCreateMessage createMsg = new NetworkObjectCreateMessage
             {
                 NetworkId = networkObject.NetworkId,
                 PrefabType = networkObject.PrefabType,
-                Position = networkObject.transform.position,
-                Rotation = networkObject.transform.rotation.eulerAngles
+                Position = networkObject.CurrentPos,
             };
 
 
-            var msg = ConvertToEnvelope(_netCreateObject.Serialize(createMsg), MessageType.ObjectCreate, ip, true);
+            byte[] msg = ConvertToEnvelope(_netCreateObject.Serialize(createMsg), MessageType.ObjectCreate, ip, true);
             _connection.Send(msg, ip);
         }
     }
@@ -109,7 +113,7 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            var message = _netString.Deserialize(data);
+            string message = _netString.Deserialize(data);
             OnConsoleMessageReceived?.Invoke(message);
 
             if (string.IsNullOrEmpty(message)) return;
@@ -134,13 +138,13 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
 
             Vector3 position = _netVector3.Deserialize(data);
 
-            if (!_clientManager.TryGetClientId(ip, out var clientId))
+            if (!_clientManager.TryGetClientId(ip, out int clientId))
             {
-                Console.WriteLineWarning($"[ServerMessageDispatcher] Position update from unknown client {ip}");
+                Console.WriteLine($"[ServerMessageDispatcher] Position update from unknown client {ip}");
                 return;
             }
 
-            _playerManager.UpdatePlayerPosition(clientId, position);
+            UpdatePlayerPosition(clientId, position);
 
             ServerNetworkManager.OnSerializedBroadcast.Invoke(position, MessageType.Position, clientId);
         }
@@ -150,13 +154,15 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
         }
     }
 
+    protected abstract void UpdatePlayerPosition(int clientId, Vector3 position);
+
     private void HandlePing(byte[] data, IPEndPoint ip)
     {
         try
         {
-            if (!_clientManager.TryGetClientId(ip, out var clientId))
+            if (!_clientManager.TryGetClientId(ip, out int clientId))
             {
-                Console.WriteLineWarning($"[ServerMessageDispatcher] Ping from unknown client {ip}");
+                Console.WriteLine($"[ServerMessageDispatcher] Ping from unknown client {ip}");
                 return;
             }
 
@@ -202,29 +208,26 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
 
             PlayerInput input = _netPlayerInput.Deserialize(arg1);
 
-            if (!_clientManager.TryGetClientId(arg2, out var clientId))
+            if (!_clientManager.TryGetClientId(arg2, out int clientId))
             {
-                Console.WriteLineWarning($"[ServerMessageDispatcher] Player input from unknown client {arg2}");
+                Console.WriteLine($"[ServerMessageDispatcher] Player input from unknown client {arg2}");
                 return;
             }
+            
+            
+            UpdatePlayerInput(clientId, input);
 
-            _playerManager.UpdatePlayerInput(clientId, input);
-
-
-            GameObject player = _playerManager.GetAllPlayers()[clientId];
-            Vector3 pos = player.transform.position;
+            Vector3 pos = NetworkObjectFactory.Instance.GetNetworkObject(ClientIdToObjectId[clientId]).CurrentPos;
             NetworkObjectFactory.Instance.UpdateNetworkObjectPosition(clientId, pos);
 
             if (input.IsShooting)
             {
-                var bullet = NetworkObjectFactory.Instance.CreateNetworkObject(player.transform.position,
-                    Vector3.zero, NetObjectTypes.Projectile, _playerManager.GetPlayerColor(clientId));
-                var createMsg = new NetworkObjectCreateMessage
+                NetworkObject bullet = NetworkObjectFactory.Instance.CreateNetworkObject(pos, NetObjectTypes.Projectile, ClientColor[clientId]);
+                NetworkObjectCreateMessage createMsg = new NetworkObjectCreateMessage
                 {
                     NetworkId = bullet.NetworkId,
                     PrefabType = NetObjectTypes.Projectile,
-                    Position = bullet.transform.position,
-                    Rotation = Vector3.zero
+                    Position = bullet.CurrentPos,
                 };
 
                 ServerNetworkManager.OnSerializedBroadcast.Invoke(createMsg, MessageType.ObjectCreate, -1);
@@ -238,15 +241,18 @@ public class ServerMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private NetworkObject CreateNetworkObject(Vector3 position, Vector3 rotation, NetObjectTypes objectType, int color)
+    private Dictionary<int,int> ClientIdToObjectId = new Dictionary<int, int>();
+    private Dictionary<int,int> ClientColor = new Dictionary<int, int>();
+    protected abstract void UpdatePlayerInput(int clientId, PlayerInput input);
+
+    private NetworkObject CreateNetworkObject(Vector3 position, NetObjectTypes objectType, int color)
     {
-        var networkObject = NetworkObjectFactory.Instance.CreateNetworkObject(position, rotation, objectType, color);
-        var createMsg = new NetworkObjectCreateMessage
+        NetworkObject networkObject = NetworkObjectFactory.Instance.CreateNetworkObject(position, objectType, color);
+        NetworkObjectCreateMessage createMsg = new NetworkObjectCreateMessage
         {
             NetworkId = networkObject.NetworkId,
             PrefabType = objectType,
-            Position = networkObject.transform.position,
-            Rotation = rotation,
+            Position = networkObject.CurrentPos,
             Color = color
         };
         ServerNetworkManager.OnSerializedBroadcast.Invoke(createMsg, MessageType.ObjectCreate, -1);

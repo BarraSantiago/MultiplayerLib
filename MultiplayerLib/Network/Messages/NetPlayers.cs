@@ -5,11 +5,11 @@ namespace Network.Messages;
 
 public class NetPlayers : IMessage<Dictionary<int, Vector3>>
 {
-    public IReadOnlyDictionary<int, GameObject> Data;
+    public IReadOnlyDictionary<int, Vector3> Data;
 
     public NetPlayers()
     {
-        Data = new ConcurrentDictionary<int, GameObject>();
+        Data = new ConcurrentDictionary<int, Vector3>();
     }
 
     public MessageType GetMessageType()
@@ -23,10 +23,10 @@ public class NetPlayers : IMessage<Dictionary<int, Vector3>>
 
         outData.AddRange(BitConverter.GetBytes(Data.Count));
 
-        foreach (KeyValuePair<int, GameObject> kvp in Data)
+        foreach (KeyValuePair<int, Vector3> kvp in Data)
         {
             outData.AddRange(BitConverter.GetBytes(kvp.Key));
-            Vector3 position = kvp.Value.transform.position;
+            Vector3 position = kvp.Value;
             outData.AddRange(BitConverter.GetBytes(position.X));
             outData.AddRange(BitConverter.GetBytes(position.Y));
             outData.AddRange(BitConverter.GetBytes(position.Z));

@@ -23,9 +23,9 @@ public class NetString : IMessage<string>
 
     public byte[] Serialize()
     {
-        var outData = new List<byte>();
+        List<byte> outData = new List<byte>();
 
-        var stringBytes = Encoding.UTF8.GetBytes(Data);
+        byte[] stringBytes = Encoding.UTF8.GetBytes(Data);
         outData.AddRange(BitConverter.GetBytes(stringBytes.Length));
         outData.AddRange(stringBytes);
 
@@ -34,8 +34,8 @@ public class NetString : IMessage<string>
 
     public string Deserialize(byte[] message)
     {
-        var offset = 0;
-        var stringLength = BitConverter.ToInt32(message, offset);
+        int offset = 0;
+        int stringLength = BitConverter.ToInt32(message, offset);
         offset += 4;
 
         Data = Encoding.UTF8.GetString(message, offset, stringLength);
@@ -44,9 +44,9 @@ public class NetString : IMessage<string>
 
     public byte[] Serialize(string newData)
     {
-        var outData = new List<byte>();
+        List<byte> outData = new List<byte>();
 
-        var stringBytes = Encoding.UTF8.GetBytes(newData);
+        byte[] stringBytes = Encoding.UTF8.GetBytes(newData);
         outData.AddRange(BitConverter.GetBytes(stringBytes.Length));
         outData.AddRange(stringBytes);
 

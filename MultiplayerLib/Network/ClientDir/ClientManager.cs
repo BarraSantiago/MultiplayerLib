@@ -34,10 +34,10 @@ public class ClientManager
 
     public int AddClient(IPEndPoint endpoint)
     {
-        if (_ipToId.TryGetValue(endpoint, out var client)) return client;
+        if (_ipToId.TryGetValue(endpoint, out int client)) return client;
 
-        var id = _clientIdCounter++;
-        var newClient = new Client(endpoint, id, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
+        int id = _clientIdCounter++;
+        Client newClient = new Client(endpoint, id, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
 
         _ipToId[endpoint] = id;
         _clients[id] = newClient;
@@ -50,7 +50,7 @@ public class ClientManager
 
     public bool RemoveClient(IPEndPoint endpoint)
     {
-        if (!_ipToId.TryGetValue(endpoint, out var clientId))
+        if (!_ipToId.TryGetValue(endpoint, out int clientId))
             return false;
 
         _ipToId.TryRemove(endpoint, out _);
@@ -62,7 +62,7 @@ public class ClientManager
 
     public void UpdateClientTimestamp(int clientId)
     {
-        if (!_clients.TryGetValue(clientId, out var client)) return;
+        if (!_clients.TryGetValue(clientId, out Client client)) return;
         client.LastHeartbeatTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
         _clients[clientId] = client;
     }
@@ -70,9 +70,9 @@ public class ClientManager
     public List<IPEndPoint> GetTimedOutClients(float timeout)
     {
         float currentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-        var timedOut = new List<IPEndPoint>();
+        List<IPEndPoint> timedOut = new List<IPEndPoint>();
 
-        foreach (var client in _clients)
+        foreach (KeyValuePair<int, Client> client in _clients)
         {
             if (currentTime - client.Value.LastHeartbeatTime <= timeout) continue;
 

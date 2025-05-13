@@ -28,15 +28,16 @@ public class ClientNetworkManager : AbstractNetworkManager
         try
         {
             _connection = new UdpConnection(ip, port, this);
-            _messageDispatcher = new ClientMessageDispatcher(_playerManager, _connection, _clientManager);
+            _messageDispatcher = new ClientMessageDispatcher(_connection, _clientManager);
             ClientMessageDispatcher.OnSendToServer += SendToServer;
             _serverEndpoint = new IPEndPoint(ip, port);
 
-            GameObject player = new GameObject();
-            player.AddComponent<Player>();
+            // TODO create players game object
+            //GameObject player = new GameObject();
+            //player.AddComponent<Player>();
 
             _clientManager.AddClient(_serverEndpoint);
-            var playerData = new PlayerData
+            PlayerData playerData = new PlayerData
             {
                 Name = pName,
                 Color = color
@@ -55,7 +56,7 @@ public class ClientNetworkManager : AbstractNetworkManager
     {
         try
         {
-            var serializedData = SerializeMessage(data, messageType);
+            byte[] serializedData = SerializeMessage(data, messageType);
 
             if (_connection != null)
                 _messageDispatcher.SendMessage(serializedData, messageType, _serverEndpoint, isImportant);

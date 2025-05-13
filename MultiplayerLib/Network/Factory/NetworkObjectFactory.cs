@@ -1,13 +1,11 @@
-﻿using System.Diagnostics;
-using System.Drawing;
-using System.Numerics;
+﻿using System.Numerics;
+using MultiplayerLib.Game;
 using MultiplayerLib.Network.interfaces;
-using Network.interfaces;
+using MultiplayerLib.Network.Server;
 using Network.Messages;
-using Network.Server;
 using Utils;
 
-namespace Network.Factory;
+namespace MultiplayerLib.Network.Factory;
 
 public enum NetObjectTypes
 {
@@ -23,59 +21,39 @@ public class NetworkObjectCreateMessage
     public int NetworkId;
     public Vector3 Position;
     public NetObjectTypes PrefabType;
-    public Vector3 Rotation;
 }
 
-public class NetworkObjectFactory : MonoBehaviourSingleton<NetworkObjectFactory>
+public abstract class NetworkObjectFactory : MonoBehaviourSingleton<NetworkObjectFactory>
 {
     private readonly Dictionary<int, NetworkObject> _networkObjects = new();
-    private readonly Dictionary<NetObjectTypes, GameObject> _prefabs = new();
-    [SerializeField] private readonly List<GameObject> registeredPrefabs = new();
     private int _networkIdCounter;
-
-    private void Awake()
+    public static Action<int, Vector3> OnPositionUpdate;
+    public static Action<int, Vector3> OnObjectDestroy;
+    public abstract void CreateGameObject(NetworkObjectCreateMessage createMsg);
+    public abstract void UpdateObjectPosition(int id, Vector3 position);
+    public NetworkObject CreateNetworkObject(Vector3 position, NetObjectTypes netObj, int color, bool isOwner = false)
     {
-        var netObjTypes = (NetObjectTypes[])Enum.GetValues(typeof(NetObjectTypes));
-        for (var i = 0; i < registeredPrefabs.Count; i++)
+        
+        int netId = GetNextNetworkId();
+        CreateGameObject(new NetworkObjectCreateMessage
         {
-            GameObject prefab = registeredPrefabs[i];
-            NetworkObject netObj = prefab.GetComponent<NetworkObject>();
-            if (netObj) RegisterPrefab(prefab, netObjTypes[i + 1]);
-        }
-    }
-
-    public void RegisterPrefab(GameObject prefab, NetObjectTypes netObjType)
-    {
-        if (_prefabs.ContainsKey(netObjType)) return;
-
-        NetworkObject netObj = prefab.GetComponent<NetworkObject>();
-        if (!netObj) return;
-
-        _prefabs[netObjType] = prefab;
-    }
-
-    public NetworkObject CreateNetworkObject(Vector3 position, Vector3 rotation, NetObjectTypes netObj, int color,
-        bool isOwner = false)
-    {
-        if (!_prefabs.TryGetValue(netObj, out GameObject prefab)) return null;
-
-        var netId = GetNextNetworkId();
-        Quaternion rot = Quaternion.Euler(rotation);
-        GameObject instance = Instantiate(prefab, position, rot);
-
-        instance.GetComponent<MeshRenderer>().material.color = color switch
+            NetworkId = netId,
+            Position = position,
+            PrefabType = netObj,
+            Color = color
+        });
+        NetworkObject networkObject = netObj switch 
         {
-            0 => Color.red,
-            1 => Color.blue,
-            2 => Color.green,
-            _ => Color.red
+            NetObjectTypes.Player => new NetPlayer(position, netObj),
+            NetObjectTypes.Projectile => CreateNetworkObject(position, netObj, color),
+            _ => throw new ArgumentOutOfRangeException(nameof(netObj), netObj, null)
         };
-
-        NetworkObject networkObject = instance.GetComponent<NetworkObject>();
+        
         networkObject.Initialize(netId, isOwner, netObj);
 
         return networkObject;
     }
+
 
     public void RegisterObject(NetworkObject obj)
     {
@@ -104,8 +82,7 @@ public class NetworkObjectFactory : MonoBehaviourSingleton<NetworkObjectFactory>
 
     public void DestroyNetworkObject(int networkId)
     {
-        if (!_networkObjects.TryGetValue(networkId, out var obj)) return;
-        Destroy(obj.gameObject);
+        if (!_networkObjects.TryGetValue(networkId, out NetworkObject? obj)) return;
         _networkObjects.Remove(networkId);
     }
 
@@ -116,39 +93,42 @@ public class NetworkObjectFactory : MonoBehaviourSingleton<NetworkObjectFactory>
 
     public void HandleCreateObjectMessage(NetworkObjectCreateMessage createMsg)
     {
-        var netObjectType = createMsg.PrefabType;
-
-        if (!_prefabs.TryGetValue(netObjectType, out GameObject prefab)) return;
-
+        CreateGameObject( new NetworkObjectCreateMessage
+        {
+            NetworkId = createMsg.NetworkId,
+            Position = createMsg.Position,
+            PrefabType = createMsg.PrefabType,
+            Color = createMsg.Color
+        });
+        NetObjectTypes netObjectType = createMsg.PrefabType;
+        
         if (_networkObjects.ContainsKey(createMsg.NetworkId))
         {
-            Debug.LogWarning($"[NetworkObjectFactory] Object with ID {createMsg.NetworkId} already exists.");
+            Console.WriteLine($"[NetworkObjectFactory] Object with ID {createMsg.NetworkId} already exists.");
             return;
         }
-
-        GameObject instance = Instantiate(prefab, createMsg.Position, Quaternion.Euler(createMsg.Rotation));
-        instance.GetComponent<MeshRenderer>().material.color = createMsg.Color switch
+        
+        NetworkObject networkObject = createMsg switch 
         {
-            0 => Color.red,
-            1 => Color.blue,
-            2 => Color.green,
-            _ => Color.red
+            { PrefabType: NetObjectTypes.Player } => new NetPlayer(createMsg.Position, createMsg.PrefabType),
+            { PrefabType: NetObjectTypes.Projectile } => new Bullet(createMsg.Position, netObjectType),
+            _ => throw new ArgumentOutOfRangeException(nameof(createMsg.PrefabType), createMsg.PrefabType, null)
         };
-        NetworkObject networkObject = instance.GetComponent<NetworkObject>();
 
         networkObject.Initialize(createMsg.NetworkId, false, netObjectType);
     }
 
     public void UpdateNetworkObjectPosition(int clientId, Vector3 pos)
     {
-        if (_networkObjects.TryGetValue(clientId, out var networkObject))
+        if (_networkObjects.TryGetValue(clientId, out NetworkObject? networkObject))
         {
             networkObject.LastUpdatedPos = pos;
-            networkObject.transform.position = pos;
+            networkObject.CurrentPos = pos;
+            UpdateObjectPosition(clientId, pos);
         }
         else
         {
-            Debug.LogWarning($"[NetworkObjectFactory] Network object with ID {clientId} not found.");
+            Console.WriteLine($"[NetworkObjectFactory] Network object with ID {clientId} not found.");
         }
     }
 }

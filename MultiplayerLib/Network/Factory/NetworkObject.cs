@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using Network.Messages;
 
-namespace Network.Factory;
+namespace MultiplayerLib.Network.Factory;
 
 public abstract class NetworkObject
 {
@@ -9,6 +9,7 @@ public abstract class NetworkObject
     public bool IsOwner { get; private set; }
     public NetObjectTypes PrefabType { get; set; } = NetObjectTypes.None;
     public Vector3 LastUpdatedPos { get; set; } = Vector3.Zero;
+    public Vector3 CurrentPos { get; set; } = Vector3.Zero;
 
     public virtual void Initialize(int networkId, bool isOwner, NetObjectTypes prefabType)
     {

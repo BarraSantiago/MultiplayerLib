@@ -1,7 +1,10 @@
 ﻿using System.Net;
+using System.Numerics;
+using MultiplayerLib.Game;
+using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
+using MultiplayerLib.Network.Messages;
 using Network.ClientDir;
-using Network.Factory;
 using Network.Messages;
 
 namespace Network.interfaces;
@@ -26,12 +29,9 @@ public abstract class BaseMessageDispatcher
     protected float _currentLatency = 0;
     protected float _lastPing;
     protected float _lastResendCheckTime;
-    protected PlayerManager _playerManager;
 
-    protected BaseMessageDispatcher(PlayerManager playerManager, UdpConnection connection,
-        ClientManager clientManager)
+    protected BaseMessageDispatcher(UdpConnection connection, ClientManager clientManager)
     {
-        _playerManager = playerManager;
         _connection = connection;
         _clientManager = clientManager;
         _messageHandlers = new Dictionary<MessageType, Action<byte[], IPEndPoint>>();
@@ -47,10 +47,10 @@ public abstract class BaseMessageDispatcher
     {
         _messageHandlers[MessageType.Acknowledgment] = (data, ip) =>
         {
-            var offset = 0;
-            var ackedType = (MessageType)BitConverter.ToInt32(data, offset);
+            int offset = 0;
+            MessageType ackedType = (MessageType)BitConverter.ToInt32(data, offset);
             offset += 4;
-            var ackedNumber = BitConverter.ToInt32(data, offset);
+            int ackedNumber = BitConverter.ToInt32(data, offset);
 
             MessageTracker.ConfirmMessage(ip, ackedType, ackedNumber);
         };
@@ -62,16 +62,16 @@ public abstract class BaseMessageDispatcher
         {
             if (data == null)
             {
-                Console.WriteLineWarning(
+                Console.WriteLine(
                     $"[MessageDispatcher] Dropped malformed packet from {ip}: insufficient data length ({data?.Length ?? 0} bytes)");
                 return false;
             }
 
-            var envelope = MessageEnvelope.Deserialize(data);
+            MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
 
             if (envelope.IsImportant) SendAcknowledgment(envelope.MessageType, envelope.MessageNumber, ip);
 
-            if (_messageHandlers.TryGetValue(envelope.MessageType, out var handler))
+            if (_messageHandlers.TryGetValue(envelope.MessageType, out Action<byte[], IPEndPoint>? handler))
             {
                 handler(envelope.Data, ip);
                 return true;
@@ -88,7 +88,7 @@ public abstract class BaseMessageDispatcher
 
     protected void SendAcknowledgment(MessageType ackedType, int ackedNumber, IPEndPoint target)
     {
-        var ackData = new List<byte>();
+        List<byte> ackData = new List<byte>();
         ackData.AddRange(BitConverter.GetBytes((int)ackedType));
         ackData.AddRange(BitConverter.GetBytes(ackedNumber));
 
@@ -98,9 +98,9 @@ public abstract class BaseMessageDispatcher
     public byte[] ConvertToEnvelope(byte[] data, MessageType messageType, IPEndPoint target, bool isImportant,
         bool isCritical = false)
     {
-        var messageNumber = MessageTracker.GetNextMessageNumber(messageType);
+        int messageNumber = MessageTracker.GetNextMessageNumber(messageType);
 
-        var envelope = new MessageEnvelope
+        MessageEnvelope envelope = new MessageEnvelope
         {
             IsCritical = isCritical,
             MessageType = messageType,
@@ -109,7 +109,7 @@ public abstract class BaseMessageDispatcher
             Data = data
         };
 
-        var serializedEnvelope = envelope.Serialize();
+        byte[] serializedEnvelope = envelope.Serialize();
 
         if (isImportant && target != null)
             MessageTracker.AddPendingMessage(serializedEnvelope, target, messageType, messageNumber);
@@ -120,9 +120,9 @@ public abstract class BaseMessageDispatcher
     public virtual void SendMessage(byte[] data, MessageType messageType, IPEndPoint target, bool isImportant,
         bool isCritical = false)
     {
-        var messageNumber = MessageTracker.GetNextMessageNumber(messageType);
+        int messageNumber = MessageTracker.GetNextMessageNumber(messageType);
 
-        var envelope = new MessageEnvelope
+        MessageEnvelope envelope = new MessageEnvelope
         {
             IsCritical = isCritical,
             MessageType = messageType,
@@ -131,7 +131,7 @@ public abstract class BaseMessageDispatcher
             Data = data
         };
 
-        var serializedEnvelope = envelope.Serialize();
+        byte[] serializedEnvelope = envelope.Serialize();
 
         if (isImportant) MessageTracker.AddPendingMessage(serializedEnvelope, target, messageType, messageNumber);
 
@@ -190,7 +190,7 @@ public abstract class BaseMessageDispatcher
             case MessageType.Acknowledgment:
                 if (data is int ackedNumber)
                 {
-                    var ackData = new byte[4];
+                    byte[] ackData = new byte[4];
                     Buffer.BlockCopy(BitConverter.GetBytes(ackedNumber), 0, ackData, 0, 4);
                     return ackData;
                 }
@@ -208,18 +208,18 @@ public abstract class BaseMessageDispatcher
 
     public void CheckAndResendMessages()
     {
-        float currentTime = Time.realtimeSinceStartup;
+        float currentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
         if (currentTime - _lastResendCheckTime < ResendInterval)
             return;
 
         _lastResendCheckTime = currentTime;
 
-        var pendingMessages =
+        Dictionary<IPEndPoint, List<MessageTracker.PendingMessage>> pendingMessages =
             MessageTracker.GetPendingMessages();
-        foreach (var endpointMessages in pendingMessages)
+        foreach (KeyValuePair<IPEndPoint, List<MessageTracker.PendingMessage>> endpointMessages in pendingMessages)
         {
-            var target = endpointMessages.Key;
-            foreach (var message in endpointMessages.Value)
+            IPEndPoint target = endpointMessages.Key;
+            foreach (MessageTracker.PendingMessage message in endpointMessages.Value)
                 if (currentTime - message.LastSentTime >= ResendInterval)
                 {
                     AbstractNetworkManager.Instance.SendMessage(message.Data, target);
@@ -235,7 +235,7 @@ public abstract class BaseMessageDispatcher
         if (data == null || data.Length < 4)
             throw new ArgumentException("[MessageDispatcher] Invalid byte array for deserialization");
 
-        var messageTypeInt = BitConverter.ToInt32(data, 0);
+        int messageTypeInt = BitConverter.ToInt32(data, 0);
         return (MessageType)messageTypeInt;
     }
 }

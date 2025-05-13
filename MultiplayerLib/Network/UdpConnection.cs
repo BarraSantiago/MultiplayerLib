@@ -42,7 +42,7 @@ public class UdpConnection
         {
             while (_dataReceivedQueue.Count > 0)
             {
-                var dataReceived = _dataReceivedQueue.Dequeue();
+                DataReceived dataReceived = _dataReceivedQueue.Dequeue();
                 _receiver?.OnReceiveData(dataReceived.Data, dataReceived.ipEndPoint);
             }
         }
@@ -52,7 +52,7 @@ public class UdpConnection
     {
         try
         {
-            var dataReceived = new DataReceived();
+            DataReceived dataReceived = new DataReceived();
             dataReceived.Data = _connection.EndReceive(ar, ref dataReceived.ipEndPoint);
 
             lock (_handler)

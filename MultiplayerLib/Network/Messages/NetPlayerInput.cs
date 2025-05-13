@@ -1,4 +1,7 @@
-﻿namespace Network.Messages;
+﻿using MultiplayerLib.Game;
+using Network.Messages;
+
+namespace MultiplayerLib.Network.Messages;
 
 public class NetPlayerInput : IMessage<PlayerInput>
 {
@@ -11,9 +14,9 @@ public class NetPlayerInput : IMessage<PlayerInput>
 
     public byte[] Serialize()
     {
-        var message = new List<byte>();
-        message.AddRange(BitConverter.GetBytes(PlayerInputData.MoveDirection.x));
-        message.AddRange(BitConverter.GetBytes(PlayerInputData.MoveDirection.y));
+        List<byte> message = new List<byte>();
+        message.AddRange(BitConverter.GetBytes(PlayerInputData.MoveDirection.X));
+        message.AddRange(BitConverter.GetBytes(PlayerInputData.MoveDirection.Y));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsJumping ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsShooting ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsCrouching ? 1 : 0));
@@ -26,11 +29,11 @@ public class NetPlayerInput : IMessage<PlayerInput>
     public PlayerInput Deserialize(byte[] message)
     {
         PlayerInput inputData = new PlayerInput();
-        var offset = 0;
+        int offset = 0;
 
-        inputData.MoveDirection.x = BitConverter.ToSingle(message, offset);
+        inputData.MoveDirection.X = BitConverter.ToSingle(message, offset);
         offset += 4;
-        inputData.MoveDirection.y = BitConverter.ToSingle(message, offset);
+        inputData.MoveDirection.Y = BitConverter.ToSingle(message, offset);
         offset += 4;
         inputData.IsJumping = BitConverter.ToBoolean(message, offset);
         offset += 1;
@@ -45,9 +48,9 @@ public class NetPlayerInput : IMessage<PlayerInput>
 
     public byte[] Serialize(PlayerInput inputData)
     {
-        var message = new List<byte>();
-        message.AddRange(BitConverter.GetBytes(inputData.MoveDirection.x));
-        message.AddRange(BitConverter.GetBytes(inputData.MoveDirection.y));
+        List<byte> message = new List<byte>();
+        message.AddRange(BitConverter.GetBytes(inputData.MoveDirection.X));
+        message.AddRange(BitConverter.GetBytes(inputData.MoveDirection.Y));
         message.AddRange(BitConverter.GetBytes(inputData.IsJumping ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(inputData.IsShooting ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(inputData.IsCrouching ? 1 : 0));

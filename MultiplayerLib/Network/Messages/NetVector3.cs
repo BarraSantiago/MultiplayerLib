@@ -36,7 +36,7 @@ public class NetVector3 : IMessage<Vector3>
 
     public byte[] Serialize()
     {
-        var outData = new List<byte>();
+        List<byte> outData = new List<byte>();
 
         outData.AddRange(BitConverter.GetBytes(id));
         outData.AddRange(BitConverter.GetBytes(_data.X));
@@ -53,7 +53,7 @@ public class NetVector3 : IMessage<Vector3>
 
     public byte[] Serialize(Vector3 newData, int id = -1)
     {
-        var outData = new List<byte>();
+        List<byte> outData = new List<byte>();
 
         outData.AddRange(BitConverter.GetBytes(id));
         outData.AddRange(BitConverter.GetBytes(newData.X));

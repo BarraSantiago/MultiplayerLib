@@ -1,10 +1,13 @@
 ﻿using System.Net;
+using System.Numerics;
+using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
-using Network.Factory;
-using Network.interfaces;
+using Network;
+using Network.ClientDir;
 using Network.Messages;
+using Utils;
 
-namespace Network.Server;
+namespace MultiplayerLib.Network.Server;
 
 public class ServerNetworkManager : AbstractNetworkManager
 {
@@ -21,8 +24,6 @@ public class ServerNetworkManager : AbstractNetworkManager
     protected override void Awake()
     {
         base.Awake();
-        _clientManager.OnClientConnected += OnClientConnected;
-        _clientManager.OnClientDisconnected += OnClientDisconnected;
         OnSerializedBroadcast += SerializedBroadcast;
         OnSendToClient += SendToClient;
     }
@@ -34,7 +35,8 @@ public class ServerNetworkManager : AbstractNetworkManager
         try
         {
             _connection = new UdpConnection(port, this);
-            _messageDispatcher = new ServerMessageDispatcher(_playerManager, _connection, _clientManager);
+            // TODO init message dispatcher
+            //_messageDispatcher = new ServerMessageDispatcher(_connection, _clientManager);
 
             Console.WriteLine($"[ServerNetworkManager] Server started on port {port}");
         }
@@ -47,35 +49,23 @@ public class ServerNetworkManager : AbstractNetworkManager
 
     public int GetClientId(IPEndPoint ip)
     {
-        if (_clientManager.TryGetClientId(ip, out var clientId)) return clientId;
+        if (_clientManager.TryGetClientId(ip, out int clientId)) return clientId;
 
         return -1;
-    }
-
-    private void OnClientConnected(int clientId)
-    {
-        if (!_playerManager.HasPlayer(clientId))
-        {
-        }
-    }
-
-    private void OnClientDisconnected(int clientId)
-    {
-        _playerManager.RemovePlayer(clientId);
     }
 
     public void SendToClient(int clientId, object data, MessageType messageType, bool isImportant = false)
     {
         try
         {
-            if (_clientManager.TryGetClient(clientId, out var client))
+            if (_clientManager.TryGetClient(clientId, out Client client))
             {
-                var serializedData = SerializeMessage(data, messageType);
+                byte[] serializedData = SerializeMessage(data, messageType);
                 _messageDispatcher.SendMessage(serializedData, messageType, client.ipEndPoint, isImportant);
             }
             else
             {
-                Console.WriteLineWarning($"[ServerNetworkManager] Cannot send to client {clientId}: client not found");
+                Console.WriteLine($"[ServerNetworkManager] Cannot send to client {clientId}: client not found");
             }
         }
         catch (Exception e)
@@ -89,7 +79,7 @@ public class ServerNetworkManager : AbstractNetworkManager
     {
         try
         {
-            foreach (var client in _clientManager.GetAllClients())
+            foreach (KeyValuePair<int, Client> client in _clientManager.GetAllClients())
             {
                 _connection.Send(data, client.Value.ipEndPoint);
                 if (isImportant)
@@ -107,7 +97,7 @@ public class ServerNetworkManager : AbstractNetworkManager
     {
         try
         {
-            var serializedData = SerializeMessage(data, messageType, id);
+            byte[] serializedData = SerializeMessage(data, messageType, id);
             serializedData = _messageDispatcher.ConvertToEnvelope(serializedData, messageType, null, false);
             Broadcast(serializedData);
         }
@@ -119,15 +109,15 @@ public class ServerNetworkManager : AbstractNetworkManager
 
     private void SendHeartbeat()
     {
-        foreach (var client in _clientManager.GetAllClients())
+        foreach (KeyValuePair<int, Client> client in _clientManager.GetAllClients())
             _messageDispatcher.SendMessage(null, MessageType.Ping, client.Value.ipEndPoint, false);
     }
 
     private void CheckForTimeouts()
     {
-        var clientsToRemove = _clientManager.GetTimedOutClients(TimeOut);
+        List<IPEndPoint> clientsToRemove = _clientManager.GetTimedOutClients(TimeOut);
 
-        foreach (var ip in clientsToRemove) _clientManager.RemoveClient(ip);
+        foreach (IPEndPoint ip in clientsToRemove) _clientManager.RemoveClient(ip);
     }
 
     protected override void Update()
@@ -136,7 +126,7 @@ public class ServerNetworkManager : AbstractNetworkManager
 
         if (_disposed) return;
 
-        float currentTime = Time.realtimeSinceStartup;
+        float currentTime = Time.CurrentTime;
 
         if (currentTime - _lastHeartbeatTime > HeartbeatInterval)
         {
@@ -150,11 +140,10 @@ public class ServerNetworkManager : AbstractNetworkManager
             _lastTimeoutCheck = currentTime;
         }
 
-        foreach (var valuePair in NetworkObjectFactory.Instance.GetAllNetworkObjects())
+        foreach (KeyValuePair<int, NetworkObject> valuePair in NetworkObjectFactory.Instance.GetAllNetworkObjects())
         {
-            if (Mathf.Approximately(valuePair.Value.LastUpdatedPos.sqrMagnitude,
-                    valuePair.Value.transform.position.sqrMagnitude)) return;
-            valuePair.Value.LastUpdatedPos = valuePair.Value.transform.position;
+            if (Approximately(valuePair.Value.LastUpdatedPos, valuePair.Value.CurrentPos)) return;
+            valuePair.Value.LastUpdatedPos = valuePair.Value.CurrentPos;
             SerializedBroadcast(valuePair.Value.LastUpdatedPos, MessageType.Position, valuePair.Key);
         }
 
@@ -169,12 +158,12 @@ public class ServerNetworkManager : AbstractNetworkManager
     {
         try
         {
-            var playerPings = new Dictionary<int, float>();
+            Dictionary<int, float> playerPings = new Dictionary<int, float>();
 
-            foreach (var clientPair in _clientManager.GetAllClients())
+            foreach (KeyValuePair<int, Client> clientPair in _clientManager.GetAllClients())
             {
-                var clientId = clientPair.Key;
-                var clientPing = clientPair.Value.LastHeartbeatTime;
+                int clientId = clientPair.Key;
+                float clientPing = clientPair.Value.LastHeartbeatTime;
                 playerPings.Add(clientId, clientPing);
             }
 
@@ -198,8 +187,6 @@ public class ServerNetworkManager : AbstractNetworkManager
             SerializedBroadcast(null, MessageType.Disconnect);
             Console.WriteLine("[ServerNetworkManager] Server shutdown notification sent");
 
-            _clientManager.OnClientConnected -= OnClientConnected;
-            _clientManager.OnClientDisconnected -= OnClientDisconnected;
             OnSerializedBroadcast -= SerializedBroadcast;
             OnSendToClient -= SendToClient;
         }
@@ -209,5 +196,14 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
 
         base.Dispose();
+    }
+
+    private bool Approximately(Vector3 a, Vector3 b)
+    {
+        if (Math.Abs(a.X - b.X) < 0.01f && Math.Abs(a.Y - b.Y) < 0.01f && Math.Abs(a.Z - b.Z) < 0.01f)
+        {
+            return true;
+        }
+        return false;
     }
 }

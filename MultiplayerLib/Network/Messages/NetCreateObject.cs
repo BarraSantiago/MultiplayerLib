@@ -1,5 +1,5 @@
 ﻿using System.Numerics;
-using Network.Factory;
+using MultiplayerLib.Network.Factory;
 
 namespace Network.Messages;
 
@@ -14,15 +14,12 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
 
     public byte[] Serialize()
     {
-        var serializedData = new List<byte>();
+        List<byte> serializedData = new List<byte>();
         serializedData.AddRange(BitConverter.GetBytes(data.NetworkId));
         serializedData.AddRange(BitConverter.GetBytes((int)data.PrefabType));
         serializedData.AddRange(BitConverter.GetBytes(data.Position.X));
         serializedData.AddRange(BitConverter.GetBytes(data.Position.Y));
         serializedData.AddRange(BitConverter.GetBytes(data.Position.Z));
-        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.X));
-        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.Y));
-        serializedData.AddRange(BitConverter.GetBytes(data.Rotation.Z));
         serializedData.AddRange(BitConverter.GetBytes(data.Color));
 
         return serializedData.ToArray();
@@ -30,7 +27,7 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
 
     public NetworkObjectCreateMessage Deserialize(byte[] message)
     {
-        var newData = new NetworkObjectCreateMessage
+        NetworkObjectCreateMessage newData = new NetworkObjectCreateMessage
         {
             NetworkId = BitConverter.ToInt32(message, 0),
             PrefabType = (NetObjectTypes)BitConverter.ToInt32(message, 4),
@@ -38,11 +35,6 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
                 BitConverter.ToSingle(message, 8),
                 BitConverter.ToSingle(message, 12),
                 BitConverter.ToSingle(message, 16)
-            ),
-            Rotation = new Vector3(
-                BitConverter.ToSingle(message, 20),
-                BitConverter.ToSingle(message, 24),
-                BitConverter.ToSingle(message, 28)
             ),
             Color = BitConverter.ToInt32(message, 32)
         };
@@ -52,15 +44,12 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
 
     public byte[] Serialize(NetworkObjectCreateMessage newData)
     {
-        var serializedData = new List<byte>();
+        List<byte> serializedData = new List<byte>();
         serializedData.AddRange(BitConverter.GetBytes(newData.NetworkId));
         serializedData.AddRange(BitConverter.GetBytes((int)newData.PrefabType));
         serializedData.AddRange(BitConverter.GetBytes(newData.Position.X));
         serializedData.AddRange(BitConverter.GetBytes(newData.Position.Y));
         serializedData.AddRange(BitConverter.GetBytes(newData.Position.Z));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.X));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.Y));
-        serializedData.AddRange(BitConverter.GetBytes(newData.Rotation.Z));
         serializedData.AddRange(BitConverter.GetBytes(newData.Color));
 
         return serializedData.ToArray();

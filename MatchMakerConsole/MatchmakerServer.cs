@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Network.ClientDir;
 
 namespace MatchMakerConsole;
 
@@ -54,7 +55,7 @@ public class MatchmakerServer
     public async Task RunAsync()
     {
         // Start listening for messages in a separate task
-        var receiveTask = ReceiveMessagesAsync();
+        Task receiveTask = ReceiveMessagesAsync();
 
         // Start periodic tasks in a separate task
         Task periodicTask = RunPeriodicTasksAsync();
@@ -73,16 +74,17 @@ public class MatchmakerServer
     private async Task ReceiveMessagesAsync()
     {
         while (_isRunning)
+        {
             try
             {
-                var result = await _udpClient.ReceiveAsync();
-                var data = result.Buffer;
-                var clientEndPoint = result.RemoteEndPoint;
+                UdpReceiveResult result = await _udpClient.ReceiveAsync();
+                byte[] data = result.Buffer;
+                IPEndPoint clientEndPoint = result.RemoteEndPoint;
 
-                if (data.Length < 4) continue; // Ignore invalid messages
+                if (data.Length < 4) continue;
 
-                var messageType = (MessageType)BitConverter.ToInt32(data, 0);
-                var messageData = data.Skip(4).ToArray();
+                MessageType messageType = (MessageType)BitConverter.ToInt32(data, 0);
+                byte[] messageData = data.Skip(4).ToArray();
 
                 HandleMessage(messageType, messageData, clientEndPoint);
             }
@@ -90,6 +92,7 @@ public class MatchmakerServer
             {
                 Console.WriteLine($"Error receiving message: {ex.Message}");
             }
+        }
     }
 
     private void HandleMessage(MessageType messageType, byte[] messageData, IPEndPoint sender)
@@ -97,7 +100,7 @@ public class MatchmakerServer
         switch (messageType)
         {
             case MessageType.Registration:
-                var name = Encoding.UTF8.GetString(messageData);
+                string name = Encoding.UTF8.GetString(messageData);
                 HandleRegistration(sender, name);
                 break;
 
@@ -125,8 +128,7 @@ public class MatchmakerServer
         }
 
         // Create new client
-        Client client = new Client(clientEndPoint, _nextClientId++,
-            DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond)
+        Client client = new Client(clientEndPoint, _nextClientId++, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond)
         {
             Name = name
         };
@@ -143,7 +145,9 @@ public class MatchmakerServer
     private void UpdateClientHeartbeat(IPEndPoint clientEndPoint)
     {
         if (_connectedClients.TryGetValue(clientEndPoint, out Client client))
+        {
             client.LastHeartbeatTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+        }
     }
 
     private void HandleDisconnect(IPEndPoint clientEndPoint)
@@ -166,7 +170,7 @@ public class MatchmakerServer
     {
         try
         {
-            var typeBytes = BitConverter.GetBytes((int)MessageType.
+            byte[] typeBytes = BitConverter.GetBytes((int)MessageType.Console
         }
     }
 
@@ -175,7 +179,7 @@ public class MatchmakerServer
         try
         {
             // Setup process start info
-            var startInfo = new ProcessStartInfo
+            ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = gameServerExecutablePath,
                 Arguments = $"-port {port} -serverId {serverId}",
@@ -183,8 +187,7 @@ public class MatchmakerServer
                 CreateNoWindow = false
             };
 
-            // Start the server process
-            var serverProcess = new Process { StartInfo = startInfo };
+            Process serverProcess = new Process { StartInfo = startInfo };
             serverProcess.EnableRaisingEvents = true;
             serverProcess.Exited += (sender, args) => HandleServerTermination(serverId);
             serverProcess.Start();
@@ -213,9 +216,9 @@ public class MatchmakerServer
         if (data.Length < 8)
             throw new ArgumentException("Invalid server info data");
 
-        var ipLength = BitConverter.ToInt32(data, 0);
-        var ip = Encoding.UTF8.GetString(data, 4, ipLength);
-        var port = BitConverter.ToInt32(data, 4 + ipLength);
+        int ipLength = BitConverter.ToInt32(data, 0);
+        string ip = Encoding.UTF8.GetString(data, 4, ipLength);
+        int port = BitConverter.ToInt32(data, 4 + ipLength);
 
         return new ServerConnectionInfo
         {

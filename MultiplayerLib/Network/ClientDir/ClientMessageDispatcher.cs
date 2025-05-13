@@ -1,6 +1,6 @@
 ﻿using System.Net;
 using System.Numerics;
-using Network.Factory;
+using MultiplayerLib.Network.Factory;
 using Network.interfaces;
 using Network.Messages;
 
@@ -10,9 +10,9 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
 {
     public static Action<object, MessageType, bool> OnSendToServer;
 
-    public ClientMessageDispatcher(PlayerManager playerManager, UdpConnection connection,
+    public ClientMessageDispatcher(UdpConnection connection,
         ClientManager clientManager)
-        : base(playerManager, connection, clientManager)
+        : base(connection, clientManager)
     {
     }
 
@@ -40,11 +40,11 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
                 return;
             }
 
-            var pingData = _netPingBroadcast.Deserialize(arg1);
-            foreach (var data in pingData)
+            (int, float)[] pingData = _netPingBroadcast.Deserialize(arg1);
+            foreach ((int, float) data in pingData)
             {
-                var clientId = data.Item1;
-                var ping = data.Item2;
+                int clientId = data.Item1;
+                float ping = data.Item2;
             }
         }
         catch (Exception ex)
@@ -55,8 +55,8 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
 
     private void HandleAcknowledgment(byte[] arg1, IPEndPoint arg2)
     {
-        var ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
-        var ackedNumber = BitConverter.ToInt32(arg1, 4);
+        MessageType ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
+        int ackedNumber = BitConverter.ToInt32(arg1, 4);
 
         MessageTracker.ConfirmMessage(arg2, ackedType, ackedNumber);
     }
@@ -76,7 +76,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            var message = _netString.Deserialize(data);
+            string message = _netString.Deserialize(data);
             OnConsoleMessageReceived?.Invoke(message);
             Console.WriteLine($"[ClientMessageDispatcher] Console message received: {message}");
         }
@@ -97,9 +97,9 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
             }
 
             Vector3 position = _netVector3.Deserialize(data);
-            var objectId = _netVector3.GetId(data);
+            int objectId = _netVector3.GetId(data);
 
-            NetworkObjectFactory.Instance.GetAllNetworkObjects()[objectId].transform.position = position;
+            NetworkObjectFactory.Instance.GetAllNetworkObjects()[objectId].CurrentPos = position;
         }
         catch (Exception ex)
         {
@@ -132,7 +132,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
                 return;
             }
 
-            var clientId = BitConverter.ToInt32(data, 0);
+            int clientId = BitConverter.ToInt32(data, 0);
         }
         catch (Exception ex)
         {
@@ -144,7 +144,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            var createMsg = _netCreateObject.Deserialize(data);
+            NetworkObjectCreateMessage createMsg = _netCreateObject.Deserialize(data);
 
             NetworkObjectFactory.Instance.HandleCreateObjectMessage(createMsg);
         }
@@ -158,7 +158,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            var networkId = BitConverter.ToInt32(data, 0);
+            int networkId = BitConverter.ToInt32(data, 0);
             NetworkObjectFactory.Instance.DestroyNetworkObject(networkId);
         }
         catch (Exception ex)
@@ -171,14 +171,14 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            var networkId = BitConverter.ToInt32(data, 0);
-            var objectMessageType = (MessageType)BitConverter.ToInt32(data, 4);
+            int networkId = BitConverter.ToInt32(data, 0);
+            MessageType objectMessageType = (MessageType)BitConverter.ToInt32(data, 4);
 
             // Get the payload (skip first 8 bytes)
-            var payload = new byte[data.Length - 8];
+            byte[] payload = new byte[data.Length - 8];
             Array.Copy(data, 8, payload, 0, payload.Length);
 
-            var obj = NetworkObjectFactory.Instance.GetNetworkObject(networkId);
+            NetworkObject? obj = NetworkObjectFactory.Instance.GetNetworkObject(networkId);
             if (obj != null) obj.OnNetworkMessage(payload, objectMessageType);
         }
         catch (Exception ex)

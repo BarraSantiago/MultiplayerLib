@@ -16,7 +16,7 @@ public class MessageEnvelope
 
     public byte[] Serialize()
     {
-        var result = new List<byte>();
+        List<byte> result = new List<byte>();
         result.Add(BitConverter.GetBytes(IsCritical ? 1 : 0)[0]);
         result.AddRange(BitConverter.GetBytes((int)MessageType));
         result.AddRange(BitConverter.GetBytes(MessageNumber));
@@ -24,7 +24,7 @@ public class MessageEnvelope
 
         if (Data != null)
         {
-            var dataToAdd = IsCritical ? EncryptData(Data) : Data;
+            byte[] dataToAdd = IsCritical ? EncryptData(Data) : Data;
             result.AddRange(dataToAdd);
         }
 
@@ -41,8 +41,8 @@ public class MessageEnvelope
         // 1 (critical) + 4 (msgType) + 4 (msgNum) + 1 (important) + 8 (checksums) = 18 bytes
         if (data == null) throw new ArgumentException("Data too short to be a valid message envelope");
 
-        var envelope = new MessageEnvelope();
-        var offset = 0;
+        MessageEnvelope envelope = new MessageEnvelope();
+        int offset = 0;
 
         envelope.IsCritical = data[offset] == 1;
         offset += 1;
@@ -57,12 +57,12 @@ public class MessageEnvelope
         offset += 1;
 
         // Calculate data length (everything except header and checksums)
-        var dataLength = data.Length - offset - 8;
+        int dataLength = data.Length - offset - 8;
 
         // Handle message content (which could be null/empty)
         if (dataLength > 0)
         {
-            var messageData = new byte[dataLength];
+            byte[] messageData = new byte[dataLength];
             Array.Copy(data, offset, messageData, 0, dataLength);
             envelope.Data = envelope.IsCritical ? DecryptData(messageData) : messageData;
             offset += dataLength;
@@ -88,7 +88,7 @@ public class MessageEnvelope
 
     private void CalculateChecksums()
     {
-        CalculateChecksums(out var checksum, out var checksum2);
+        CalculateChecksums(out int checksum, out int checksum2);
         Checksum1 = checksum;
         Checksum2 = checksum2;
     }
@@ -98,20 +98,20 @@ public class MessageEnvelope
         uint uChecksum1 = 0;
         uint uChecksum2 = 0x12345678;
 
-        var headerData = new byte[10];
+        byte[] headerData = new byte[10];
         headerData[0] = (byte)(IsCritical ? 1 : 0);
         Array.Copy(BitConverter.GetBytes((int)MessageType), 0, headerData, 1, 4);
         Array.Copy(BitConverter.GetBytes(MessageNumber), 0, headerData, 5, 4);
         headerData[9] = (byte)(IsImportant ? 1 : 0);
 
-        for (var i = 0; i < headerData.Length; i++)
+        for (int i = 0; i < headerData.Length; i++)
         {
             uChecksum1 += headerData[i];
             uChecksum2 ^= (uint)(headerData[i] << (i & 0x0F));
         }
 
         if (Data != null)
-            for (var i = 0; i < Data.Length; i++)
+            for (int i = 0; i < Data.Length; i++)
             {
                 uChecksum1 += Data[i];
                 uChecksum2 ^= (uint)(Data[i] << ((i + headerData.Length) & 0x0F));
@@ -128,17 +128,17 @@ public class MessageEnvelope
 
     private byte[] EncryptData(byte[] data)
     {
-        using var sha256 = SHA256.Create();
-        var key = sha256.ComputeHash(Encoding.UTF8.GetBytes("SecretKey"));
+        using SHA256 sha256 = SHA256.Create();
+        byte[] key = sha256.ComputeHash(Encoding.UTF8.GetBytes("SecretKey"));
 
-        using var aes = Aes.Create();
+        using Aes aes = Aes.Create();
         aes.Key = key;
         aes.GenerateIV();
 
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new MemoryStream();
         ms.Write(aes.IV, 0, aes.IV.Length);
 
-        using var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
+        using CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
         cs.Write(data, 0, data.Length);
         cs.FlushFinalBlock();
         return ms.ToArray();
@@ -146,18 +146,18 @@ public class MessageEnvelope
 
     private static byte[] DecryptData(byte[] encryptedData)
     {
-        using var sha256 = SHA256.Create();
-        var key = sha256.ComputeHash(Encoding.UTF8.GetBytes("SecretKey"));
+        using SHA256 sha256 = SHA256.Create();
+        byte[] key = sha256.ComputeHash(Encoding.UTF8.GetBytes("SecretKey"));
 
-        using var aes = Aes.Create();
+        using Aes aes = Aes.Create();
         aes.Key = key;
 
-        var iv = new byte[16]; // AES block size
+        byte[] iv = new byte[16]; // AES block size
         Array.Copy(encryptedData, 0, iv, 0, iv.Length);
         aes.IV = iv;
 
-        using var ms = new MemoryStream();
-        using var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write);
+        using MemoryStream ms = new MemoryStream();
+        using CryptoStream cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write);
         cs.Write(encryptedData, iv.Length, encryptedData.Length - iv.Length);
         cs.FlushFinalBlock();
         return ms.ToArray();

@@ -13,8 +13,7 @@ public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNe
 
     protected UdpConnection _connection;
     protected bool _disposed;
-    protected BaseMessageDispatcher _messageDispatcher;
-    protected PlayerManager _playerManager;
+    public BaseMessageDispatcher _messageDispatcher;
 
     public int Port { get; protected set; }
 
@@ -28,7 +27,6 @@ public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNe
             Thread.Sleep(100);
 
             _connection?.Close();
-            _playerManager.Clear();
             _clientManager.Clear();
         }
         catch (Exception e)
@@ -54,7 +52,6 @@ public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNe
     protected virtual void Awake()
     {
         _clientManager = new ClientManager();
-        _playerManager = new PlayerManager();
     }
 
     public virtual void SendMessage(byte[] data, IPEndPoint ipEndPoint)
