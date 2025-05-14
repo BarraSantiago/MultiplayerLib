@@ -1,11 +1,3 @@
-**/obj/*
 **/bin/*
-**/obj/
-obj/
 bin/
-obj
-MatchMakerConsole/obj/
-/MatchMakerConsole/obj
-/MultiplayerLib/obj
-/MultiplayerLib/obj/*
 .idea/

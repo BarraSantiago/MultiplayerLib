@@ -1,0 +1,5 @@
+F:\Image Campus\Image 2025\Cuatrimestre 1\Multiplayer\MultiplayerLib\MatchMakerConsole\obj\Release\net7.0\MatchMakerConsole.csproj.AssemblyReference.cache
+F:\Image Campus\Image 2025\Cuatrimestre 1\Multiplayer\MultiplayerLib\MatchMakerConsole\obj\Release\net7.0\MatchMakerConsole.GeneratedMSBuildEditorConfig.editorconfig
+F:\Image Campus\Image 2025\Cuatrimestre 1\Multiplayer\MultiplayerLib\MatchMakerConsole\obj\Release\net7.0\MatchMakerConsole.AssemblyInfoInputs.cache
+F:\Image Campus\Image 2025\Cuatrimestre 1\Multiplayer\MultiplayerLib\MatchMakerConsole\obj\Release\net7.0\MatchMakerConsole.AssemblyInfo.cs
+F:\Image Campus\Image 2025\Cuatrimestre 1\Multiplayer\MultiplayerLib\MatchMakerConsole\obj\Release\net7.0\MatchMakerConsole.csproj.CoreCompileInputs.cache

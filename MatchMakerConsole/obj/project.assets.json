@@ -1,0 +1,94 @@
+{
+  "version": 3,
+  "targets": {
+    "net7.0": {
+      "MultiplayerLib/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "compile": {
+          "bin/placeholder/MultiplayerLib.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/MultiplayerLib.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MultiplayerLib/1.0.0": {
+      "type": "project",
+      "path": "../MultiplayerLib/MultiplayerLib.csproj",
+      "msbuildProject": "../MultiplayerLib/MultiplayerLib.csproj"
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net7.0": [
+      "MultiplayerLib >= 1.0.0"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\barra\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "F:\\Image Campus\\Image 2025\\Cuatrimestre 1\\Multiplayer\\MultiplayerLib\\MatchMakerConsole\\MatchMakerConsole.csproj",
+      "projectName": "MatchMakerConsole",
+      "projectPath": "F:\\Image Campus\\Image 2025\\Cuatrimestre 1\\Multiplayer\\MultiplayerLib\\MatchMakerConsole\\MatchMakerConsole.csproj",
+      "packagesPath": "C:\\Users\\barra\\.nuget\\packages\\",
+      "outputPath": "F:\\Image Campus\\Image 2025\\Cuatrimestre 1\\Multiplayer\\MultiplayerLib\\MatchMakerConsole\\obj\\",
+      "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
+      "configFilePaths": [
+        "C:\\Users\\barra\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config"
+      ],
+      "originalTargetFrameworks": [
+        "net7.0"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net7.0": {
+          "targetAlias": "net7.0",
+          "projectReferences": {
+            "F:\\Image Campus\\Image 2025\\Cuatrimestre 1\\Multiplayer\\MultiplayerLib\\MultiplayerLib\\MultiplayerLib.csproj": {
+              "projectPath": "F:\\Image Campus\\Image 2025\\Cuatrimestre 1\\Multiplayer\\MultiplayerLib\\MultiplayerLib\\MultiplayerLib.csproj"
+            }
+          }
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      }
+    },
+    "frameworks": {
+      "net7.0": {
+        "targetAlias": "net7.0",
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Users\\barra\\.dotnet\\sdk\\7.0.410\\RuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}
