@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Numerics;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class NetPlayers : IMessage<Dictionary<int, Vector3>>
 {

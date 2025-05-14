@@ -1,9 +1,8 @@
 ﻿using System.Net;
 using MultiplayerLib.Network.interfaces;
-using Network.interfaces;
-using Network.Messages;
+using MultiplayerLib.Network.Messages;
 
-namespace Network.ClientDir;
+namespace MultiplayerLib.Network.ClientDir;
 
 public struct PlayerData
 {

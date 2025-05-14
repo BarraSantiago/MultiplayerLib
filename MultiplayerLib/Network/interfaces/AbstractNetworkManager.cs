@@ -1,13 +1,11 @@
 ﻿using System.Net;
-using Network;
-using Network.ClientDir;
-using Network.interfaces;
-using Network.Messages;
-using Utils;
+using MultiplayerLib.Network.ClientDir;
+using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.interfaces;
 
-public abstract class AbstractNetworkManager : MonoBehaviourSingleton<AbstractNetworkManager>, IReceiveData, IDisposable
+public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>, IReceiveData, IDisposable
 {
     protected ClientManager _clientManager;
 

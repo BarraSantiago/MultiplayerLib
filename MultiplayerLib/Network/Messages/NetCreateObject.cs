@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using MultiplayerLib.Network.Factory;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
 {

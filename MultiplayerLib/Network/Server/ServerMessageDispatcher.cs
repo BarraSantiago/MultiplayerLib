@@ -1,11 +1,10 @@
 ﻿using System.Net;
 using System.Numerics;
 using MultiplayerLib.Game;
+using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
-using Network;
-using Network.ClientDir;
-using Network.interfaces;
-using Network.Messages;
+using MultiplayerLib.Network.interfaces;
+using MultiplayerLib.Network.Messages;
 
 namespace MultiplayerLib.Network.Server;
 

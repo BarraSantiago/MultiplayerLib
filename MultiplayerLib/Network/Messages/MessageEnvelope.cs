@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class MessageEnvelope
 {
@@ -86,15 +86,17 @@ public class MessageEnvelope
         return envelope;
     }
 
-    private void CalculateChecksums()
-    {
-        CalculateChecksums(out int checksum, out int checksum2);
-        Checksum1 = checksum;
-        Checksum2 = checksum2;
-    }
 
-    private void CalculateChecksums(out int checksum1, out int checksum2)
+    private void CalculateChecksums(out int checksum1, out int checksum2, int seed = 0)
     {
+        int[][] operations = {
+            new int[] { 0, 1, 2, 3, 4 }, 
+            new int[] { 4, 3, 2, 1, 0 }, 
+            new int[] { 2, 0, 3, 1, 4 }, 
+            new int[] { 1, 4, 0, 2, 3 }, 
+            new int[] { 3, 2, 4, 0, 1 } 
+        };
+        
         uint uChecksum1 = 0;
         uint uChecksum2 = 0x12345678;
 
@@ -104,26 +106,62 @@ public class MessageEnvelope
         Array.Copy(BitConverter.GetBytes(MessageNumber), 0, headerData, 5, 4);
         headerData[9] = (byte)(IsImportant ? 1 : 0);
 
-        for (int i = 0; i < headerData.Length; i++)
+        ProcessBytes(headerData, ref uChecksum1, ref uChecksum2, operations[seed % operations.Length], 0);
+        if (Data != null)
         {
-            uChecksum1 += headerData[i];
-            uChecksum2 ^= (uint)(headerData[i] << (i & 0x0F));
+            ProcessBytes(Data, ref uChecksum1, ref uChecksum2, operations[seed % operations.Length], headerData.Length);
         }
 
-        if (Data != null)
-            for (int i = 0; i < Data.Length; i++)
-            {
-                uChecksum1 += Data[i];
-                uChecksum2 ^= (uint)(Data[i] << ((i + headerData.Length) & 0x0F));
-            }
-
         uChecksum1 = (uChecksum1 & 0xFFFF) + (uChecksum1 >> 16);
-        uChecksum1 = (uChecksum1 & 0xFFFF) + (uChecksum1 >> 16);
-
         uChecksum2 += uChecksum1;
 
         checksum1 = (int)uChecksum1;
         checksum2 = (int)uChecksum2;
+    }
+
+    private void ProcessBytes(byte[] data, ref uint uChecksum1, ref uint uChecksum2, int[] operations, int offset)
+    {
+        for (int i = 0; i < data.Length; i++)
+        {
+            int opIndex = (i + offset) % operations.Length;
+
+            switch (operations[opIndex])
+            {
+                case 0:
+                    uChecksum1 += data[i];
+                    uChecksum2 += (uint)(data[i] << 3);
+                    break;
+
+                case 1:
+                    uChecksum1 ^= (uint)(data[i] << ((i + offset) & 0x0F));
+                    uChecksum2 ^= (uint)(data[i] << ((i + offset + 3) & 0x0F));
+                    break;
+
+                case 2:
+                    uChecksum1 |= (uint)(data[i] << (i % 8));
+                    uChecksum2 |= (uint)(data[i] << ((i + 5) % 8));
+                    break;
+
+                case 3: 
+                    uChecksum1 &= 0xFFFFFFFF - (uint)data[i];
+                    uChecksum2 &= 0xFFFFFFFF - (uint)(data[i] << 2);
+                    break;
+
+                case 4:
+                    uChecksum1 = (uChecksum1 << 3) | (uChecksum1 >> 29);
+                    uChecksum2 = (uChecksum2 << 5) | (uChecksum2 >> 27);
+                    uChecksum1 += data[i];
+                    uChecksum2 ^= data[i];
+                    break;
+            }
+        }
+    }
+
+    private void CalculateChecksums()
+    {
+        CalculateChecksums(out int checksum1, out int checksum2, 0);
+        Checksum1 = checksum1;
+        Checksum2 = checksum2;
     }
 
     private byte[] EncryptData(byte[] data)

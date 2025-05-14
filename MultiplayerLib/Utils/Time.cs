@@ -1,4 +1,4 @@
-namespace Utils;
+namespace MultiplayerLib.Utils;
 
 public static class Time
 {

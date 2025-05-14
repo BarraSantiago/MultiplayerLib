@@ -1,9 +1,9 @@
 ﻿using System.Numerics;
 using MultiplayerLib.Game;
 using MultiplayerLib.Network.interfaces;
+using MultiplayerLib.Network.Messages;
 using MultiplayerLib.Network.Server;
-using Network.Messages;
-using Utils;
+using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.Factory;
 
@@ -23,7 +23,7 @@ public class NetworkObjectCreateMessage
     public NetObjectTypes PrefabType;
 }
 
-public abstract class NetworkObjectFactory : MonoBehaviourSingleton<NetworkObjectFactory>
+public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
 {
     private readonly Dictionary<int, NetworkObject> _networkObjects = new();
     private int _networkIdCounter;

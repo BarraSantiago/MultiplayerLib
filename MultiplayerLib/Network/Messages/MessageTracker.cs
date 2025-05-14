@@ -1,6 +1,7 @@
 ﻿using System.Net;
+using MultiplayerLib.Utils;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class MessageTracker
 {
@@ -27,7 +28,7 @@ public class MessageTracker
             Data = data,
             MessageType = type,
             MessageNumber = number,
-            LastSentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond
+            LastSentTime = Time.CurrentTime
         };
     }
 
@@ -40,7 +41,7 @@ public class MessageTracker
     {
         if (_pendingMessages.TryGetValue(target, out Dictionary<(MessageType, int), PendingMessage>? messages) &&
             messages.TryGetValue((type, number), out PendingMessage? message))
-            message.LastSentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+            message.LastSentTime = Time.CurrentTime;
     }
 
     public Dictionary<IPEndPoint, List<PendingMessage>> GetPendingMessages()

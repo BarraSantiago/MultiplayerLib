@@ -1,7 +1,7 @@
 ﻿using System.Text;
-using Network.ClientDir;
+using MultiplayerLib.Network.ClientDir;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class NetHandShake : IMessage<PlayerData>
 {

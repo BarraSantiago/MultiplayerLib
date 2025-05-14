@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Network.packets;
+namespace MultiplayerLib.Network.packets;
 
 public enum PacketType
 {

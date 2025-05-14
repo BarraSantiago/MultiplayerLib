@@ -1,13 +1,12 @@
 ﻿using System.Net;
 using System.Numerics;
 using MultiplayerLib.Game;
+using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
-using MultiplayerLib.Network.interfaces;
 using MultiplayerLib.Network.Messages;
-using Network.ClientDir;
-using Network.Messages;
+using MultiplayerLib.Utils;
 
-namespace Network.interfaces;
+namespace MultiplayerLib.Network.interfaces;
 
 public abstract class BaseMessageDispatcher
 {
@@ -208,7 +207,7 @@ public abstract class BaseMessageDispatcher
 
     public void CheckAndResendMessages()
     {
-        float currentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+        float currentTime = Time.CurrentTime;
         if (currentTime - _lastResendCheckTime < ResendInterval)
             return;
 

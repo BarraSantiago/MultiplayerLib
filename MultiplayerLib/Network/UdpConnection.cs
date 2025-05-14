@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
-using Network.interfaces;
+using MultiplayerLib.Network.interfaces;
 
-namespace Network;
+namespace MultiplayerLib.Network;
 
 public class UdpConnection
 {

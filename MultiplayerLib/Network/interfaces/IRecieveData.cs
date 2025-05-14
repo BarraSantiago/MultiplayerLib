@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Network.interfaces;
+namespace MultiplayerLib.Network.interfaces;
 
 public interface IReceiveData
 {

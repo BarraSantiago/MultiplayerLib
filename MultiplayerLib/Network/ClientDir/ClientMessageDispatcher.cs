@@ -1,10 +1,11 @@
 ﻿using System.Net;
 using System.Numerics;
 using MultiplayerLib.Network.Factory;
-using Network.interfaces;
-using Network.Messages;
+using MultiplayerLib.Network.interfaces;
+using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Utils;
 
-namespace Network.ClientDir;
+namespace MultiplayerLib.Network.ClientDir;
 
 public class ClientMessageDispatcher : BaseMessageDispatcher
 {
@@ -111,8 +112,8 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            _currentLatency = (DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond - _lastPing) * 1000;
-            _lastPing = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;;
+            _currentLatency = (Time.CurrentTime - _lastPing) * 1000;
+            _lastPing = Time.CurrentTime;;
 
             OnSendToServer?.Invoke(null, MessageType.Ping, false);
         }

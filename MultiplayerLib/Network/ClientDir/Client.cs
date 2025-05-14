@@ -1,8 +1,8 @@
 ﻿using System.Net;
 
-namespace Network.ClientDir;
+namespace MultiplayerLib.Network.ClientDir;
 
-public struct Client
+public record struct Client
 {
     public float LastHeartbeatTime;
     public int id;

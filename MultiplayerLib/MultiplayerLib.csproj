@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>netstandard2.1</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <OutputPath>F:\Image Campus\Image 2025\Cuatrimestre 1\Multiplayer\Multiplayer-2025\Assets\Scripts\DLL\</OutputPath>
+        <LangVersion>10</LangVersion>
     </PropertyGroup>
 
 </Project>

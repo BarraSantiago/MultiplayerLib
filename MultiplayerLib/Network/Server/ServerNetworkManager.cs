@@ -1,11 +1,10 @@
 ﻿using System.Net;
 using System.Numerics;
+using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
-using Network;
-using Network.ClientDir;
-using Network.Messages;
-using Utils;
+using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.Server;
 
@@ -200,10 +199,6 @@ public class ServerNetworkManager : AbstractNetworkManager
 
     private bool Approximately(Vector3 a, Vector3 b)
     {
-        if (Math.Abs(a.X - b.X) < 0.01f && Math.Abs(a.Y - b.Y) < 0.01f && Math.Abs(a.Z - b.Z) < 0.01f)
-        {
-            return true;
-        }
-        return false;
+        return Math.Abs(a.X - b.X) < 0.01f && Math.Abs(a.Y - b.Y) < 0.01f && Math.Abs(a.Z - b.Z) < 0.01f;
     }
 }

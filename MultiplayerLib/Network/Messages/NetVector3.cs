@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class NetVector3 : IMessage<Vector3>
 {

@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 
-namespace Network.Messages;
+namespace MultiplayerLib.Network.Messages;
 
 public class MessageHeader
 {

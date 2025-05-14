@@ -1,7 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
+using MultiplayerLib.Utils;
 
-namespace Network.ClientDir;
+namespace MultiplayerLib.Network.ClientDir;
 
 public class ClientManager
 {
@@ -37,7 +38,7 @@ public class ClientManager
         if (_ipToId.TryGetValue(endpoint, out int client)) return client;
 
         int id = _clientIdCounter++;
-        Client newClient = new Client(endpoint, id, DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
+        Client newClient = new Client(endpoint, id, Time.CurrentTime);
 
         _ipToId[endpoint] = id;
         _clients[id] = newClient;
@@ -63,13 +64,13 @@ public class ClientManager
     public void UpdateClientTimestamp(int clientId)
     {
         if (!_clients.TryGetValue(clientId, out Client client)) return;
-        client.LastHeartbeatTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+        client.LastHeartbeatTime = Time.CurrentTime;
         _clients[clientId] = client;
     }
 
     public List<IPEndPoint> GetTimedOutClients(float timeout)
     {
-        float currentTime = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+        float currentTime = Time.CurrentTime;
         List<IPEndPoint> timedOut = new List<IPEndPoint>();
 
         foreach (KeyValuePair<int, Client> client in _clients)

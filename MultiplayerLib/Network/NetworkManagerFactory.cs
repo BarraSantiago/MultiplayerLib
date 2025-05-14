@@ -1,7 +1,4 @@
-﻿using System.Net;
-using Network.ClientDir;
-
-namespace Network;
+﻿namespace MultiplayerLib.Network;
 
 public class NetworkManagerFactory 
 {

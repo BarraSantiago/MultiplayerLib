@@ -1,5 +1,5 @@
 ﻿using System.Numerics;
-using Network.Messages;
+using MultiplayerLib.Network.Messages;
 
 namespace MultiplayerLib.Network.Factory;
 
