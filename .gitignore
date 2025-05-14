@@ -52,3 +52,17 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+**/obj/*
+**/bin/*
+**/obj/
+MatchMakerConsole/obj/Debug/net7.0/MatchMakerConsole.AssemblyInfo.cs
+MatchMakerConsole/obj/Debug/net7.0/MatchMakerConsole.AssemblyInfoInputs.cache
+MatchMakerConsole/obj/Debug/net7.0/MatchMakerConsole.assets.cache
+MatchMakerConsole/obj/Debug/net7.0/MatchMakerConsole.GeneratedMSBuildEditorConfig.editorconfig
+MatchMakerConsole/obj/MatchMakerConsole.csproj.nuget.dgspec.json
+MatchMakerConsole/obj/MatchMakerConsole.csproj.nuget.g.props
+MatchMakerConsole/obj/project.assets.json
+MatchMakerConsole/obj/project.nuget.cache
+MatchMakerConsole/obj/project.packagespec.json
+MatchMakerConsole/obj/rider.project.model.nuget.info
+MatchMakerConsole/obj/rider.project.restore.info
