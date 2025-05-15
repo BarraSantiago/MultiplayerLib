@@ -36,7 +36,7 @@ public class NetCreateObject : IMessage<NetworkObjectCreateMessage>
                 BitConverter.ToSingle(message, 12),
                 BitConverter.ToSingle(message, 16)
             ),
-            Color = BitConverter.ToInt32(message, 32)
+            Color = BitConverter.ToInt32(message, 20)
         };
 
         return newData;

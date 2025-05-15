@@ -7,14 +7,12 @@ namespace MultiplayerLib.Network.interfaces;
 
 public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>, IReceiveData, IDisposable
 {
-    protected ClientManager _clientManager;
-
     protected UdpConnection _connection;
     protected bool _disposed;
     public BaseMessageDispatcher _messageDispatcher;
 
     public int Port { get; protected set; }
-
+    
     public virtual void Dispose()
     {
         if (_disposed) return;
@@ -25,7 +23,6 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
             Thread.Sleep(100);
 
             _connection?.Close();
-            _clientManager.Clear();
         }
         catch (Exception e)
         {
@@ -47,11 +44,6 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
         }
     }
 
-    protected virtual void Awake()
-    {
-        _clientManager = new ClientManager();
-    }
-
     public virtual void SendMessage(byte[] data, IPEndPoint ipEndPoint)
     {
         try
@@ -69,7 +61,7 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
         return _messageDispatcher.SerializeMessage(data, messageType, id);
     }
 
-    protected virtual void Update()
+    public virtual void Tick()
     {
         if (_disposed) return;
 

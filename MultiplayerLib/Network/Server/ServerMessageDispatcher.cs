@@ -10,9 +10,12 @@ namespace MultiplayerLib.Network.Server;
 
 public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 {
-    public ServerMessageDispatcher(UdpConnection connection, ClientManager clientManager)
-        : base(connection, clientManager)
+    private ClientManager _clientManager;
+    private Dictionary<int, int> ClientIdToObjectId = new Dictionary<int, int>();
+    private Dictionary<int, int> ClientColor = new Dictionary<int, int>();
+    public ServerMessageDispatcher(ClientManager clientManager)
     {
+        _clientManager = clientManager;
     }
 
     protected override void InitializeMessageHandlers()
@@ -21,7 +24,6 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         _messageHandlers[MessageType.Console] = HandleConsoleMessage;
         _messageHandlers[MessageType.Position] = HandlePositionUpdate;
         _messageHandlers[MessageType.Ping] = HandlePing;
-        _messageHandlers[MessageType.Id] = HandleIdMessage;
         _messageHandlers[MessageType.ObjectCreate] = HandleObjectCreate;
         _messageHandlers[MessageType.ObjectDestroy] = HandleObjectDestroy;
         _messageHandlers[MessageType.ObjectUpdate] = HandleObjectUpdate;
@@ -38,6 +40,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             return;
         }
 
+        MessageTracker.RemoveMessages(arg2);
         _clientManager.RemoveClient(arg2);
         NetworkObjectFactory.Instance.DestroyNetworkObject(clientId);
         ServerNetworkManager.OnSerializedBroadcast.Invoke(clientId, MessageType.ObjectDestroy, clientId);
@@ -56,17 +59,13 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
-            int clientId = _clientManager.AddClient(ip);
             PlayerData pData = _netHandShake.Deserialize(data);
+            Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
+            NetworkObject pObject = CreateNetworkObject(Vector3.Zero, NetObjectTypes.Player, pData.Color);
+            int clientId = _clientManager.AddClient(ip, pObject.NetworkId);
+            
             ClientColor[clientId] = pData.Color;
-            CreateNetworkObject(Vector3.Zero,NetObjectTypes.Player, pData.Color);
-
             _clientManager.UpdateClientTimestamp(clientId);
-
-            List<byte> newId = BitConverter.GetBytes((int)MessageType.Id).ToList();
-            newId.AddRange(BitConverter.GetBytes(clientId));
-            _connection.Send(newId.ToArray(), ip);
 
             ServerNetworkManager.OnSerializedBroadcast.Invoke(Vector3.Zero, MessageType.HandShake, clientId);
             Dictionary<int, Vector3> players = new Dictionary<int, Vector3>();
@@ -74,12 +73,11 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             {
                 players.Add(netObj.NetworkId, netObj.CurrentPos);
             }
+
             _netPlayers.Data = players;
             SendObjectsToClient(ip, networkObjects);
             byte[] msg = ConvertToEnvelope(_netPlayers.Serialize(), MessageType.HandShake, ip, true);
-            _connection.Send(msg, ip);
-
-
+            ServerNetworkManager.OnSendToClient?.Invoke(clientId, msg, MessageType.HandShake, true);
             Console.WriteLine($"[ServerMessageDispatcher] New client {clientId} connected from {ip}");
         }
         catch (Exception ex)
@@ -87,7 +85,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             Console.WriteLine($"[ServerMessageDispatcher] Error in HandleHandshake: {ex.Message}");
         }
     }
-
+    
     private void SendObjectsToClient(IPEndPoint ip, Dictionary<int, NetworkObject> networkObjects)
     {
         foreach (KeyValuePair<int, NetworkObject> kvp in networkObjects)
@@ -104,7 +102,8 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
 
             byte[] msg = ConvertToEnvelope(_netCreateObject.Serialize(createMsg), MessageType.ObjectCreate, ip, true);
-            _connection.Send(msg, ip);
+            _clientManager.TryGetClientId(ip, out int clientId);
+            ServerNetworkManager.OnSendToClient?.Invoke(clientId, msg, MessageType.ObjectCreate, false);
         }
     }
 
@@ -174,12 +173,6 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleIdMessage(byte[] data, IPEndPoint ip)
-    {
-        Console.WriteLine("[ServerMessageDispatcher] Received ID message from client (unexpected)");
-    }
-
-
     private void HandleObjectDestroy(byte[] arg1, IPEndPoint arg2)
     {
         throw new NotImplementedException();
@@ -212,8 +205,8 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
                 Console.WriteLine($"[ServerMessageDispatcher] Player input from unknown client {arg2}");
                 return;
             }
-            
-            
+
+
             UpdatePlayerInput(clientId, input);
 
             Vector3 pos = NetworkObjectFactory.Instance.GetNetworkObject(ClientIdToObjectId[clientId]).CurrentPos;
@@ -221,7 +214,9 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
             if (input.IsShooting)
             {
-                NetworkObject bullet = NetworkObjectFactory.Instance.CreateNetworkObject(pos, NetObjectTypes.Projectile, ClientColor[clientId]);
+                NetworkObject bullet =
+                    NetworkObjectFactory.Instance.CreateNetworkObject(pos, NetObjectTypes.Projectile,
+                        ClientColor[clientId]);
                 NetworkObjectCreateMessage createMsg = new NetworkObjectCreateMessage
                 {
                     NetworkId = bullet.NetworkId,
@@ -239,11 +234,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             Console.WriteLine($"[ServerMessageDispatcher] Error in HandlePlayerInput: {ex.Message}");
         }
     }
-
-    private Dictionary<int,int> ClientIdToObjectId = new Dictionary<int, int>();
-    private Dictionary<int,int> ClientColor = new Dictionary<int, int>();
-    protected abstract void UpdatePlayerInput(int clientId, PlayerInput input);
-
+    
     private NetworkObject CreateNetworkObject(Vector3 position, NetObjectTypes objectType, int color)
     {
         NetworkObject networkObject = NetworkObjectFactory.Instance.CreateNetworkObject(position, objectType, color);
@@ -258,4 +249,6 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
         return networkObject;
     }
+
+    protected abstract void UpdatePlayerInput(int clientId, PlayerInput input);
 }

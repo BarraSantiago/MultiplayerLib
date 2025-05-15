@@ -33,11 +33,10 @@ public class ClientManager
         return _clients;
     }
 
-    public int AddClient(IPEndPoint endpoint)
+    public int AddClient(IPEndPoint endpoint, int id)
     {
         if (_ipToId.TryGetValue(endpoint, out int client)) return client;
 
-        int id = _clientIdCounter++;
         Client newClient = new Client(endpoint, id, Time.CurrentTime);
 
         _ipToId[endpoint] = id;

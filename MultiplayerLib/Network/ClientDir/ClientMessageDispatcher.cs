@@ -10,10 +10,9 @@ namespace MultiplayerLib.Network.ClientDir;
 public class ClientMessageDispatcher : BaseMessageDispatcher
 {
     public static Action<object, MessageType, bool> OnSendToServer;
+    public static Action OnServerDisconnect;
 
-    public ClientMessageDispatcher(UdpConnection connection,
-        ClientManager clientManager)
-        : base(connection, clientManager)
+    public ClientMessageDispatcher()
     {
     }
 
@@ -23,12 +22,18 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         _messageHandlers[MessageType.Console] = HandleConsoleMessage;
         _messageHandlers[MessageType.Position] = HandlePositionUpdate;
         _messageHandlers[MessageType.Ping] = HandlePing;
-        _messageHandlers[MessageType.Id] = HandleIdMessage;
         _messageHandlers[MessageType.ObjectCreate] = HandleObjectCreate;
         _messageHandlers[MessageType.ObjectDestroy] = HandleObjectDestroy;
         _messageHandlers[MessageType.ObjectUpdate] = HandleObjectUpdate;
         _messageHandlers[MessageType.Acknowledgment] = HandleAcknowledgment;
         _messageHandlers[MessageType.PingBroadcast] = HandlePingBroadcast;
+        _messageHandlers[MessageType.Disconnect] = HandleDisconnect;
+    }
+
+    private void HandleDisconnect(byte[] arg1, IPEndPoint arg2)
+    {
+        MessageTracker.Clear();
+        OnServerDisconnect?.Invoke();
     }
 
     private void HandlePingBroadcast(byte[] arg1, IPEndPoint arg2)
@@ -120,24 +125,6 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         catch (Exception ex)
         {
             Console.WriteLine($"[ClientMessageDispatcher] Error in HandlePing: {ex.Message}");
-        }
-    }
-
-    private void HandleIdMessage(byte[] data, IPEndPoint ip)
-    {
-        try
-        {
-            if (data == null || data.Length < 4)
-            {
-                Console.WriteLine("[ClientMessageDispatcher] Invalid ID message data");
-                return;
-            }
-
-            int clientId = BitConverter.ToInt32(data, 0);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandleIdMessage: {ex.Message}");
         }
     }
 

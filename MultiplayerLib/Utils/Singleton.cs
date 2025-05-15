@@ -31,4 +31,13 @@ public class Singleton<T> where T : Singleton<T>
     {
         Initialize();
     }
+    
+    public static void SetInstance(T instance)
+    {
+        if (_instance != null)
+        {
+            throw new InvalidOperationException("Singleton instance already set.");
+        }
+        _instance = instance;
+    }
 }

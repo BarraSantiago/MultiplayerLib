@@ -11,4 +11,10 @@ public class NetPlayer : NetworkObject
         CurrentPos = position;
         LastUpdatedPos = position;
     }
+
+    public int NetworkId { get; set; }
+    public bool IsOwner { get; set; }
+    public NetObjectTypes PrefabType { get; set; }
+    public Vector3 LastUpdatedPos { get; set; }
+    public virtual Vector3 CurrentPos { get; set; }
 }

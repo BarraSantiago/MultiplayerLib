@@ -38,7 +38,7 @@ public class MatchmakerServer
     private int _nextServerPort;
 
     public MatchmakerServer(int port = 12345, int playersPerServer = 2, int minPlayersToStartMatches = 4,
-        string gameServerPath = "GameServer.exe", int startingPort = 123456)
+        string gameServerPath = "GameServer.exe", int startingPort = 12346)
     {
         _port = port;
         _playersPerServer = playersPerServer;

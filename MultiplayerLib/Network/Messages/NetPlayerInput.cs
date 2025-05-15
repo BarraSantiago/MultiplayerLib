@@ -19,7 +19,6 @@ public class NetPlayerInput : IMessage<PlayerInput>
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsJumping ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsShooting ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsCrouching ? 1 : 0));
-        message.AddRange(BitConverter.GetBytes(PlayerInputData.Timestamp));
 
         return message.ToArray();
     }
@@ -39,8 +38,6 @@ public class NetPlayerInput : IMessage<PlayerInput>
         inputData.IsShooting = BitConverter.ToBoolean(message, offset);
         offset += 1;
         inputData.IsCrouching = BitConverter.ToBoolean(message, offset);
-        offset += 1;
-        inputData.Timestamp = BitConverter.ToSingle(message, offset);
 
         return inputData;
     }
@@ -53,7 +50,6 @@ public class NetPlayerInput : IMessage<PlayerInput>
         message.AddRange(BitConverter.GetBytes(inputData.IsJumping ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(inputData.IsShooting ? 1 : 0));
         message.AddRange(BitConverter.GetBytes(inputData.IsCrouching ? 1 : 0));
-        message.AddRange(BitConverter.GetBytes(inputData.Timestamp));
 
         return message.ToArray();
     }

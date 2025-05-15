@@ -34,7 +34,8 @@ public class MessageTracker
 
     public void ConfirmMessage(IPEndPoint target, MessageType type, int number)
     {
-        if (_pendingMessages.TryGetValue(target, out Dictionary<(MessageType, int), PendingMessage>? messages)) messages.Remove((type, number));
+        if (_pendingMessages.TryGetValue(target, out Dictionary<(MessageType, int), PendingMessage>? messages))
+            messages.Remove((type, number));
     }
 
     public void UpdateMessageSentTime(IPEndPoint target, MessageType type, int number)
@@ -49,16 +50,30 @@ public class MessageTracker
         Dictionary<IPEndPoint, List<PendingMessage>> result =
             new Dictionary<IPEndPoint, List<PendingMessage>>();
 
-        foreach (KeyValuePair<IPEndPoint, Dictionary<(MessageType, int), PendingMessage>> endpointEntry in _pendingMessages) result[endpointEntry.Key] = endpointEntry.Value.Values.ToList();
+        foreach (KeyValuePair<IPEndPoint, Dictionary<(MessageType, int), PendingMessage>> endpointEntry in
+                 _pendingMessages) result[endpointEntry.Key] = endpointEntry.Value.Values.ToList();
 
         return result;
     }
 
-    public class PendingMessage
+    public void RemoveMessages(IPEndPoint ipEndPoint)
     {
-        public byte[] Data { get; set; }
-        public MessageType MessageType { get; set; }
-        public int MessageNumber { get; set; }
-        public float LastSentTime { get; set; }
+        if (!_pendingMessages.ContainsKey(ipEndPoint)) return;
+        _pendingMessages[ipEndPoint].Clear();
+        _pendingMessages.Remove(ipEndPoint);
     }
+    
+    public void Clear()
+    {
+        _pendingMessages.Clear();
+        _messageCounters.Clear();
+    }
+}
+
+public class PendingMessage
+{
+    public byte[] Data { get; set; }
+    public MessageType MessageType { get; set; }
+    public int MessageNumber { get; set; }
+    public float LastSentTime { get; set; }
 }

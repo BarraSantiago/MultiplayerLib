@@ -8,5 +8,4 @@ public struct PlayerInput
     public bool IsShooting;
     public bool IsJumping;
     public bool IsCrouching;
-    public float Timestamp;
 }

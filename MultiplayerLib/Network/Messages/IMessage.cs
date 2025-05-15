@@ -7,7 +7,6 @@ public enum MessageType
     Console,
     Position,
     Ping,
-    Id,
     Acknowledgment,
     PlayerInput,
     ObjectCreate,

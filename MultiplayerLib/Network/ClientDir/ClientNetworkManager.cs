@@ -17,17 +17,18 @@ public class ClientNetworkManager : AbstractNetworkManager
     //[SerializeField] private TMP_Text heartbeatText;
 
     public IPAddress ServerIPAddress { get; private set; }
-
+    public static Action<object, MessageType, bool> OnSendToServer;
 
     public void StartClient(IPAddress ip, int port, string pName, int color)
     {
         ServerIPAddress = ip;
         Port = port;
-
+        OnSendToServer += SendToServer;
+        ClientMessageDispatcher.OnServerDisconnect += Dispose;
         try
         {
             _connection = new UdpConnection(ip, port, this);
-            _messageDispatcher = new ClientMessageDispatcher(_connection, _clientManager);
+            _messageDispatcher = new ClientMessageDispatcher();
             ClientMessageDispatcher.OnSendToServer += SendToServer;
             _serverEndpoint = new IPEndPoint(ip, port);
 
@@ -35,7 +36,6 @@ public class ClientNetworkManager : AbstractNetworkManager
             //GameObject player = new GameObject();
             //player.AddComponent<Player>();
 
-            _clientManager.AddClient(_serverEndpoint);
             PlayerData playerData = new PlayerData
             {
                 Name = pName,
@@ -83,9 +83,9 @@ public class ClientNetworkManager : AbstractNetworkManager
         _connection.Send(data);
     }
 
-    protected override void Update()
+    public override void Tick()
     {
-        base.Update();
+        base.Tick();
     }
 
     public override void Dispose()

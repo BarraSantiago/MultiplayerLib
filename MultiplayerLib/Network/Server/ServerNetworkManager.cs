@@ -19,10 +19,11 @@ public class ServerNetworkManager : AbstractNetworkManager
     public float HeartbeatInterval = 0.15f;
     public float PingBroadcastInterval = 0.50f;
     public int TimeOut = 30;
+    public ClientManager ClientManager;
 
-    protected override void Awake()
+    public void Init()
     {
-        base.Awake();
+        ClientManager = new ClientManager();
         OnSerializedBroadcast += SerializedBroadcast;
         OnSendToClient += SendToClient;
     }
@@ -34,8 +35,6 @@ public class ServerNetworkManager : AbstractNetworkManager
         try
         {
             _connection = new UdpConnection(port, this);
-            // TODO init message dispatcher
-            //_messageDispatcher = new ServerMessageDispatcher(_connection, _clientManager);
 
             Console.WriteLine($"[ServerNetworkManager] Server started on port {port}");
         }
@@ -48,7 +47,7 @@ public class ServerNetworkManager : AbstractNetworkManager
 
     public int GetClientId(IPEndPoint ip)
     {
-        if (_clientManager.TryGetClientId(ip, out int clientId)) return clientId;
+        if (ClientManager.TryGetClientId(ip, out int clientId)) return clientId;
 
         return -1;
     }
@@ -57,7 +56,7 @@ public class ServerNetworkManager : AbstractNetworkManager
     {
         try
         {
-            if (_clientManager.TryGetClient(clientId, out Client client))
+            if (ClientManager.TryGetClient(clientId, out Client client))
             {
                 byte[] serializedData = SerializeMessage(data, messageType);
                 _messageDispatcher.SendMessage(serializedData, messageType, client.ipEndPoint, isImportant);
@@ -73,12 +72,11 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
     }
 
-    public void Broadcast(byte[] data, bool isImportant = false, MessageType messageType = MessageType.None,
-        int messageNumber = -1)
+    public void Broadcast(byte[] data, bool isImportant = false, MessageType messageType = MessageType.None, int messageNumber = -1)
     {
         try
         {
-            foreach (KeyValuePair<int, Client> client in _clientManager.GetAllClients())
+            foreach (KeyValuePair<int, Client> client in ClientManager.GetAllClients())
             {
                 _connection.Send(data, client.Value.ipEndPoint);
                 if (isImportant)
@@ -108,20 +106,22 @@ public class ServerNetworkManager : AbstractNetworkManager
 
     private void SendHeartbeat()
     {
-        foreach (KeyValuePair<int, Client> client in _clientManager.GetAllClients())
+        foreach (KeyValuePair<int, Client> client in ClientManager.GetAllClients())
+        {
             _messageDispatcher.SendMessage(null, MessageType.Ping, client.Value.ipEndPoint, false);
+        }
     }
 
     private void CheckForTimeouts()
     {
-        List<IPEndPoint> clientsToRemove = _clientManager.GetTimedOutClients(TimeOut);
+        List<IPEndPoint> clientsToRemove = ClientManager.GetTimedOutClients(TimeOut);
 
-        foreach (IPEndPoint ip in clientsToRemove) _clientManager.RemoveClient(ip);
+        foreach (IPEndPoint ip in clientsToRemove) ClientManager.RemoveClient(ip);
     }
 
-    protected override void Update()
+    public override void Tick()
     {
-        base.Update();
+        base.Tick();
 
         if (_disposed) return;
 
@@ -146,11 +146,9 @@ public class ServerNetworkManager : AbstractNetworkManager
             SerializedBroadcast(valuePair.Value.LastUpdatedPos, MessageType.Position, valuePair.Key);
         }
 
-        if (currentTime - _lastPingBroadcastTime > PingBroadcastInterval)
-        {
-            BroadcastPlayerPings();
-            _lastPingBroadcastTime = currentTime;
-        }
+        if (!(currentTime - _lastPingBroadcastTime > PingBroadcastInterval)) return;
+        BroadcastPlayerPings();
+        _lastPingBroadcastTime = currentTime;
     }
 
     private void BroadcastPlayerPings()
@@ -159,7 +157,7 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             Dictionary<int, float> playerPings = new Dictionary<int, float>();
 
-            foreach (KeyValuePair<int, Client> clientPair in _clientManager.GetAllClients())
+            foreach (KeyValuePair<int, Client> clientPair in ClientManager.GetAllClients())
             {
                 int clientId = clientPair.Key;
                 float clientPing = clientPair.Value.LastHeartbeatTime;

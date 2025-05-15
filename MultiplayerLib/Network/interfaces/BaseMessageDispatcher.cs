@@ -22,17 +22,13 @@ public abstract class BaseMessageDispatcher
     protected readonly NetVector3 _netVector3 = new();
 
     public readonly MessageTracker MessageTracker = new();
-    protected ClientManager _clientManager;
 
-    protected UdpConnection _connection;
     protected float _currentLatency = 0;
     protected float _lastPing;
     protected float _lastResendCheckTime;
 
-    protected BaseMessageDispatcher(UdpConnection connection, ClientManager clientManager)
+    protected BaseMessageDispatcher()
     {
-        _connection = connection;
-        _clientManager = clientManager;
         _messageHandlers = new Dictionary<MessageType, Action<byte[], IPEndPoint>>();
         InitializeMessageHandlers();
         InitializeAcknowledgmentHandler();
@@ -75,6 +71,7 @@ public abstract class BaseMessageDispatcher
                 handler(envelope.Data, ip);
                 return true;
             }
+
 
             return false;
         }
@@ -166,10 +163,6 @@ public abstract class BaseMessageDispatcher
                 if (data is (int, float)[] pings) return _netPingBroadcast.Serialize(pings);
                 throw new ArgumentException("Data must be (int, float)[] for PingBroadcast messages");
 
-            case MessageType.Id:
-                if (data is int idValue) return BitConverter.GetBytes(idValue);
-                throw new ArgumentException("Data must be int for Id messages");
-
             case MessageType.Disconnect:
                 return null;
 
@@ -213,19 +206,19 @@ public abstract class BaseMessageDispatcher
 
         _lastResendCheckTime = currentTime;
 
-        Dictionary<IPEndPoint, List<MessageTracker.PendingMessage>> pendingMessages =
-            MessageTracker.GetPendingMessages();
-        foreach (KeyValuePair<IPEndPoint, List<MessageTracker.PendingMessage>> endpointMessages in pendingMessages)
+        Dictionary<IPEndPoint, List<PendingMessage>> pendingMessages = MessageTracker.GetPendingMessages();
+        foreach (KeyValuePair<IPEndPoint, List<PendingMessage>> endpointMessages in pendingMessages)
         {
             IPEndPoint target = endpointMessages.Key;
-            foreach (MessageTracker.PendingMessage message in endpointMessages.Value)
+            foreach (PendingMessage message in endpointMessages.Value)
+            {
                 if (currentTime - message.LastSentTime >= ResendInterval)
                 {
                     AbstractNetworkManager.Instance.SendMessage(message.Data, target);
                     MessageTracker.UpdateMessageSentTime(target, message.MessageType, message.MessageNumber);
-                    Console.WriteLine(
-                        $"[MessageDispatcher] Resending message: Type={message.MessageType}, Number={message.MessageNumber} to {target}");
+                    Console.WriteLine($"[MessageDispatcher] Resending message: Type={message.MessageType}, Number={message.MessageNumber} to {target}");
                 }
+            }
         }
     }
 

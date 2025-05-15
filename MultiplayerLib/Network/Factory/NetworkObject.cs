@@ -3,13 +3,13 @@ using MultiplayerLib.Network.Messages;
 
 namespace MultiplayerLib.Network.Factory;
 
-public abstract class NetworkObject
+public interface NetworkObject
 {
-    public int NetworkId { get; private set; } = -1;
-    public bool IsOwner { get; private set; }
-    public NetObjectTypes PrefabType { get; set; } = NetObjectTypes.None;
-    public Vector3 LastUpdatedPos { get; set; } = Vector3.Zero;
-    public Vector3 CurrentPos { get; set; } = Vector3.Zero;
+    public int NetworkId { get; protected set; }
+    public bool IsOwner { get; protected set; }
+    public NetObjectTypes PrefabType { get; set; }
+    public Vector3 LastUpdatedPos { get; set; }
+    public Vector3 CurrentPos { get; set; }
 
     public virtual void Initialize(int networkId, bool isOwner, NetObjectTypes prefabType)
     {
