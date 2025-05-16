@@ -4,6 +4,7 @@ using MultiplayerLib.Game;
 using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Network.Server;
 using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.interfaces;
@@ -17,10 +18,10 @@ public abstract class BaseMessageDispatcher
     protected readonly NetHandShake _netHandShake = new();
     protected readonly NetPingBroadcast _netPingBroadcast = new();
     protected readonly NetPlayerInput _netPlayerInput = new();
-    protected readonly NetPlayers _netPlayers = new();
     protected readonly NetString _netString = new();
     protected readonly NetVector3 _netVector3 = new();
-
+    protected readonly NetHandshakeResponse _netHandshakeResponse = new();
+    
     public readonly MessageTracker MessageTracker = new();
 
     protected float _currentLatency = 0;
@@ -51,7 +52,7 @@ public abstract class BaseMessageDispatcher
         };
     }
 
-    public bool TryDispatchMessage(byte[] data, IPEndPoint ip)
+    public MessageType TryDispatchMessage(byte[] data, IPEndPoint ip)
     {
         try
         {
@@ -59,7 +60,7 @@ public abstract class BaseMessageDispatcher
             {
                 Console.WriteLine(
                     $"[MessageDispatcher] Dropped malformed packet from {ip}: insufficient data length ({data?.Length ?? 0} bytes)");
-                return false;
+                return MessageType.None;
             }
 
             MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
@@ -69,16 +70,16 @@ public abstract class BaseMessageDispatcher
             if (_messageHandlers.TryGetValue(envelope.MessageType, out Action<byte[], IPEndPoint>? handler))
             {
                 handler(envelope.Data, ip);
-                return true;
+                return envelope.MessageType;
             }
 
 
-            return false;
+            return MessageType.None;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[MessageDispatcher] Error dispatching message: {ex.Message}");
-            return false;
+            return MessageType.None;
         }
     }
 
@@ -166,10 +167,8 @@ public abstract class BaseMessageDispatcher
             case MessageType.Disconnect:
                 return null;
 
-            // TODO serialization
             case MessageType.ObjectCreate:
                 if (data is NetworkObjectCreateMessage createMessage) return _netCreateObject.Serialize(createMessage);
-
                 throw new ArgumentException("Data must be NetworkObjectCreateMessage");
 
             case MessageType.ObjectDestroy:
@@ -186,13 +185,19 @@ public abstract class BaseMessageDispatcher
                     Buffer.BlockCopy(BitConverter.GetBytes(ackedNumber), 0, ackData, 0, 4);
                     return ackData;
                 }
-
                 throw new ArgumentException("Data must be int for Acknowledgment messages");
 
             case MessageType.PlayerInput:
                 if (data is PlayerInput input) return _netPlayerInput.Serialize(input);
-
                 throw new ArgumentException("Data must be PlayerInput for PlayerInput messages");
+            
+            case MessageType.HandShakeResponse:
+                if (data is HandshakeResponse handshakeResponse)
+                {
+                    return _netHandshakeResponse.Serialize(handshakeResponse);
+                }
+                throw new ArgumentException("Data must be HandshakeResponse for HandShakeResponse messages");
+                
             default:
                 throw new ArgumentOutOfRangeException(nameof(messageType));
         }

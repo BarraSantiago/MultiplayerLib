@@ -7,6 +7,7 @@ namespace MultiplayerLib.Network.interfaces;
 
 public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>, IReceiveData, IDisposable
 {
+    public int SecuritySeed { get; protected set; }
     protected UdpConnection _connection;
     protected bool _disposed;
     public BaseMessageDispatcher _messageDispatcher;

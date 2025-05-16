@@ -3,6 +3,7 @@ using System.Numerics;
 using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
 using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Network.Server;
 using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.ClientDir;
@@ -11,7 +12,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
 {
     public static Action<object, MessageType, bool> OnSendToServer;
     public static Action OnServerDisconnect;
-
+    public int ClientId { get; private set; } = -1;
     public ClientMessageDispatcher()
     {
     }
@@ -71,6 +72,13 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
+            HandshakeResponse response = _netHandshakeResponse.Deserialize(data);
+            ClientId = response.ClientId;
+    
+            MessageEnvelope.SetSecuritySeed(response.SecuritySeed);
+    
+            Console.WriteLine($"[ClientNetworkManager] Connected to server. Client ID: {ClientId}, Security Seed: {response.SecuritySeed}");
+
         }
         catch (Exception ex)
         {

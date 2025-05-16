@@ -8,6 +8,11 @@ using MultiplayerLib.Network.Messages;
 
 namespace MultiplayerLib.Network.Server;
 
+public class HandshakeResponse
+{
+    public int ClientId { get; set; }
+    public int SecuritySeed { get; set; }
+}
 public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 {
     private ClientManager _clientManager;
@@ -32,7 +37,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         _messageHandlers[MessageType.Disconnect] = HandleDisconnect;
     }
 
-    private void HandleDisconnect(byte[] arg1, IPEndPoint arg2)
+    public void HandleDisconnect(byte[] arg1, IPEndPoint arg2)
     {
         if (!_clientManager.TryGetClientId(arg2, out int clientId))
         {
@@ -66,8 +71,16 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             ClientColor[clientId] = pData.Color;
             _clientManager.UpdateClientTimestamp(clientId);
             Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
-            SendObjectsToClient(ip, networkObjects);
             
+            HandshakeResponse response = new HandshakeResponse
+            {
+                ClientId = clientId,
+                SecuritySeed = ServerNetworkManager.Instance.SecuritySeed
+            };
+            ServerNetworkManager.OnSendToClient?.Invoke(clientId, response, MessageType.HandShakeResponse, true);
+            
+            SendObjectsToClient(ip, networkObjects);
+
             Console.WriteLine($"[ServerMessageDispatcher] New client {clientId} connected from {ip}");
         }
         catch (Exception ex)

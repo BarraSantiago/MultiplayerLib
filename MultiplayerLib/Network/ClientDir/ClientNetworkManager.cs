@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using MultiplayerLib.Network.interfaces;
 using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.ClientDir;
 
@@ -13,6 +14,8 @@ public struct PlayerData
 public class ClientNetworkManager : AbstractNetworkManager
 {
     private IPEndPoint _serverEndpoint;
+    public float ServerTimeout = 3;
+    private float _lastServerPingTime;
     //TODO update ms text
     //[SerializeField] private TMP_Text heartbeatText;
 
@@ -25,16 +28,13 @@ public class ClientNetworkManager : AbstractNetworkManager
         Port = port;
         OnSendToServer += SendToServer;
         ClientMessageDispatcher.OnServerDisconnect += Dispose;
+        _lastServerPingTime = Time.CurrentTime;
         try
         {
             _connection = new UdpConnection(ip, port, this);
             _messageDispatcher = new ClientMessageDispatcher();
             ClientMessageDispatcher.OnSendToServer += SendToServer;
             _serverEndpoint = new IPEndPoint(ip, port);
-
-            // TODO create players game object
-            //GameObject player = new GameObject();
-            //player.AddComponent<Player>();
 
             PlayerData playerData = new PlayerData
             {
@@ -50,7 +50,15 @@ public class ClientNetworkManager : AbstractNetworkManager
             throw;
         }
     }
-
+    
+    public override void Tick()
+    {
+        base.Tick();
+        
+        if (_disposed) return;
+        CheckServerTimeout();
+    }
+    
     public void SendToServer(object data, MessageType messageType, bool isImportant = false)
     {
         try
@@ -82,12 +90,37 @@ public class ClientNetworkManager : AbstractNetworkManager
     {
         _connection.Send(data);
     }
-
-    public override void Tick()
+    
+    public override void OnReceiveData(byte[] data, IPEndPoint ip)
     {
-        base.Tick();
+        try
+        {
+            MessageType messageType = _messageDispatcher.TryDispatchMessage(data, ip);
+            
+            if (messageType == MessageType.Ping)
+            {
+                UpdateServerPingTime();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ClientNetworkManager] Error processing data: {ex.Message}");
+        }
     }
-
+    public void UpdateServerPingTime()
+    {
+        _lastServerPingTime = Time.CurrentTime;
+    }
+    
+    private void CheckServerTimeout()
+    {
+        float currentTime = Time.CurrentTime;
+        if (currentTime - _lastServerPingTime > ServerTimeout)
+        {
+            Console.WriteLine("[ClientNetworkManager] Server timeout detected. No ping received in the last 3 seconds.");
+            Dispose();
+        }
+    }
     public override void Dispose()
     {
         if (_disposed) return;

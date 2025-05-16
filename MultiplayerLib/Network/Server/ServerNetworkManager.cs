@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Security.Cryptography;
 using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
@@ -17,14 +18,23 @@ public class ServerNetworkManager : AbstractNetworkManager
     private float _lastTimeoutCheck;
     public float HeartbeatInterval = 0.15f;
     public float PingBroadcastInterval = 0.50f;
+    public float InactivityTimeout = 15f;
     public int TimeOut = 30;
     public ClientManager ClientManager;
+    private Dictionary<int, float> _lastClientActivityTime = new Dictionary<int, float>();
 
     public void Init()
     {
+        using (RandomNumberGenerator? rng = RandomNumberGenerator.Create())
+        {
+            byte[] seedBytes = new byte[4];
+            rng.GetBytes(seedBytes);
+            SecuritySeed = BitConverter.ToInt32(seedBytes, 0);
+        }
         ClientManager = new ClientManager();
         OnSerializedBroadcast += SerializedBroadcast;
         OnSendToClient += SendToClient;
+        MessageEnvelope.SetSecuritySeed(SecuritySeed);
     }
 
     public void StartServer(int port)
@@ -41,6 +51,21 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             Console.WriteLine($"[ServerNetworkManager] Failed to start server: {e.Message}");
             throw;
+        }
+    }
+
+    public override void OnReceiveData(byte[] data, IPEndPoint ip)
+    {
+        try
+        {
+            MessageType messageType = _messageDispatcher.TryDispatchMessage(data, ip);
+
+            if (messageType == MessageType.Ping || messageType == MessageType.None) return;
+            UpdateClientActivity(ip);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[NetworkManager] Error processing data from {ip}: {ex.Message}");
         }
     }
 
@@ -71,7 +96,8 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
     }
 
-    public void Broadcast(byte[] data, bool isImportant = false, MessageType messageType = MessageType.None, int messageNumber = -1)
+    public void Broadcast(byte[] data, bool isImportant = false, MessageType messageType = MessageType.None,
+        int messageNumber = -1)
     {
         try
         {
@@ -79,8 +105,10 @@ public class ServerNetworkManager : AbstractNetworkManager
             {
                 _connection.Send(data, client.Value.ipEndPoint);
                 if (isImportant)
+                {
                     _messageDispatcher.MessageTracker.AddPendingMessage(data, client.Value.ipEndPoint, messageType,
                         messageNumber);
+                }
             }
         }
         catch (Exception e)
@@ -109,13 +137,6 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             _messageDispatcher.SendMessage(null, MessageType.Ping, client.Value.ipEndPoint, false);
         }
-    }
-
-    private void CheckForTimeouts()
-    {
-        List<IPEndPoint> clientsToRemove = ClientManager.GetTimedOutClients(TimeOut);
-
-        foreach (IPEndPoint ip in clientsToRemove) ClientManager.RemoveClient(ip);
     }
 
     public override void Tick()
@@ -164,6 +185,45 @@ public class ServerNetworkManager : AbstractNetworkManager
         catch (Exception e)
         {
             Console.WriteLine($"[ServerNetworkManager] Ping broadcast failed: {e.Message}");
+        }
+    }
+
+    public void UpdateClientActivity(IPEndPoint clientEndpoint)
+    {
+        if (ClientManager.TryGetClientId(clientEndpoint, out int clientId))
+        {
+            _lastClientActivityTime[clientId] = Time.CurrentTime;
+        }
+    }
+
+    private void CheckForTimeouts()
+    {
+        List<IPEndPoint> clientsToRemove = ClientManager.GetTimedOutClients(TimeOut);
+
+        float currentTime = Time.CurrentTime;
+        foreach (KeyValuePair<int, Client> kvp in ClientManager.GetAllClients())
+        {
+            int clientId = kvp.Key;
+            Client client = kvp.Value;
+
+            if (!_lastClientActivityTime.ContainsKey(clientId))
+            {
+                _lastClientActivityTime[clientId] = currentTime;
+                continue;
+            }
+
+            if (!(currentTime - _lastClientActivityTime[clientId] > InactivityTimeout)) continue;
+            clientsToRemove.Add(client.ipEndPoint);
+            Console.WriteLine($"[ServerNetworkManager] Client {clientId} disconnected due to inactivity");
+        }
+
+        foreach (IPEndPoint ip in clientsToRemove)
+        {
+            if (!ClientManager.TryGetClientId(ip, out int clientId)) continue;
+            _lastClientActivityTime.Remove(clientId);
+
+            ServerMessageDispatcher? serverDispatcher = _messageDispatcher as ServerMessageDispatcher;
+            serverDispatcher?.HandleDisconnect(Array.Empty<byte>(), ip);
         }
     }
 

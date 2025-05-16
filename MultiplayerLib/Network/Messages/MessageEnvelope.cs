@@ -13,6 +13,13 @@ public class MessageEnvelope
 
     public int Checksum1 { get; private set; }
     public int Checksum2 { get; private set; }
+    
+    private static int _securitySeed = 0;
+    
+    public static void SetSecuritySeed(int seed)
+    {
+        _securitySeed = seed;
+    }
 
     public byte[] Serialize()
     {
@@ -37,8 +44,6 @@ public class MessageEnvelope
 
     public static MessageEnvelope Deserialize(byte[] data)
     {
-        // Validate minimum message length (header + checksums)
-        // 1 (critical) + 4 (msgType) + 4 (msgNum) + 1 (important) + 8 (checksums) = 18 bytes
         if (data == null) throw new ArgumentException("Data too short to be a valid message envelope");
 
         MessageEnvelope envelope = new MessageEnvelope();
@@ -56,10 +61,8 @@ public class MessageEnvelope
         envelope.IsImportant = data[offset] == 1;
         offset += 1;
 
-        // Calculate data length (everything except header and checksums)
         int dataLength = data.Length - offset - 8;
 
-        // Handle message content (which could be null/empty)
         if (dataLength > 0)
         {
             byte[] messageData = new byte[dataLength];
@@ -76,7 +79,6 @@ public class MessageEnvelope
         offset += 4;
         envelope.Checksum2 = BitConverter.ToInt32(data, offset);
 
-        // Validate checksums
         int calculatedChecksum1, calculatedChecksum2;
         envelope.CalculateChecksums(out calculatedChecksum1, out calculatedChecksum2);
 
@@ -156,18 +158,20 @@ public class MessageEnvelope
             }
         }
     }
-
     private void CalculateChecksums()
     {
-        CalculateChecksums(out int checksum1, out int checksum2, 0);
+        CalculateChecksums(out int checksum1, out int checksum2, _securitySeed);
         Checksum1 = checksum1;
         Checksum2 = checksum2;
     }
-
+    
+    // Update the encryption methods to use the seed
     private byte[] EncryptData(byte[] data)
     {
         using SHA256 sha256 = SHA256.Create();
-        byte[] key = sha256.ComputeHash(Encoding.UTF8.GetBytes("SecretKey"));
+        // Incorporate the seed into the key derivation
+        byte[] keyMaterial = Encoding.UTF8.GetBytes("SecretKey" + _securitySeed.ToString());
+        byte[] key = sha256.ComputeHash(keyMaterial);
 
         using Aes aes = Aes.Create();
         aes.Key = key;
@@ -185,7 +189,9 @@ public class MessageEnvelope
     private static byte[] DecryptData(byte[] encryptedData)
     {
         using SHA256 sha256 = SHA256.Create();
-        byte[] key = sha256.ComputeHash(Encoding.UTF8.GetBytes("SecretKey"));
+        // Incorporate the seed into the key derivation
+        byte[] keyMaterial = Encoding.UTF8.GetBytes("SecretKey" + _securitySeed.ToString());
+        byte[] key = sha256.ComputeHash(keyMaterial);
 
         using Aes aes = Aes.Create();
         aes.Key = key;

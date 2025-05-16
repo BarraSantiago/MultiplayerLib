@@ -13,7 +13,8 @@ public enum MessageType
     ObjectDestroy,
     ObjectUpdate,
     Disconnect,
-    PingBroadcast
+    PingBroadcast,
+    HandShakeResponse
 }
 
 public interface IMessage<T>
