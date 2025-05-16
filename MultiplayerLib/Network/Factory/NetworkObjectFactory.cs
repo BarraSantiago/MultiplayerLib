@@ -27,26 +27,20 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
 {
     protected readonly Dictionary<int, NetworkObject> _networkObjects = new();
     protected int _networkIdCounter;
-    public abstract void CreateGameObject(NetworkObjectCreateMessage createMsg);
+    public abstract void CreateGameObject(NetworkObject createMsg);
     public abstract void UpdateObjectPosition(int id, Vector3 position);
 
     public NetworkObject CreateNetworkObject(Vector3 position, NetObjectTypes netObj, int color, bool isOwner = false)
     {
         int netId = GetNextNetworkId();
-        CreateGameObject(new NetworkObjectCreateMessage
-        {
-            NetworkId = netId,
-            Position = position,
-            PrefabType = netObj,
-            Color = color
-        });
+        
         NetworkObject networkObject = netObj switch
         {
-            NetObjectTypes.Player => new NetPlayer(position, netObj),
-            NetObjectTypes.Projectile => new Bullet(position, netObj),
+            NetObjectTypes.Player => new NetPlayer(position, netObj, color),
+            NetObjectTypes.Projectile => new Bullet(position, netObj, color),
             _ => throw new ArgumentOutOfRangeException(nameof(netObj), netObj, null)
         };
-
+        CreateGameObject(networkObject);
         networkObject.Initialize(netId, isOwner, netObj);
 
         return networkObject;
@@ -82,7 +76,10 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
     {
         if (!_networkObjects.TryGetValue(networkId, out NetworkObject? obj)) return;
         _networkObjects.Remove(networkId);
+        RemoveNetworkObject(networkId);
     }
+
+    protected abstract void RemoveNetworkObject(int networkId);
 
     private int GetNextNetworkId()
     {
@@ -91,13 +88,6 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
 
     public void HandleCreateObjectMessage(NetworkObjectCreateMessage createMsg)
     {
-        CreateGameObject(new NetworkObjectCreateMessage
-        {
-            NetworkId = createMsg.NetworkId,
-            Position = createMsg.Position,
-            PrefabType = createMsg.PrefabType,
-            Color = createMsg.Color
-        });
         NetObjectTypes netObjectType = createMsg.PrefabType;
 
         if (_networkObjects.ContainsKey(createMsg.NetworkId))
@@ -108,12 +98,13 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
 
         NetworkObject networkObject = createMsg switch
         {
-            { PrefabType: NetObjectTypes.Player } => new NetPlayer(createMsg.Position, createMsg.PrefabType),
-            { PrefabType: NetObjectTypes.Projectile } => new Bullet(createMsg.Position, netObjectType),
+            { PrefabType: NetObjectTypes.Player } => new NetPlayer(createMsg.Position, createMsg.PrefabType,createMsg.Color),
+            { PrefabType: NetObjectTypes.Projectile } => new Bullet(createMsg.Position, netObjectType,createMsg.Color),
             _ => throw new ArgumentOutOfRangeException(nameof(createMsg.PrefabType), createMsg.PrefabType, null)
         };
 
         networkObject.Initialize(createMsg.NetworkId, false, netObjectType);
+        CreateGameObject(networkObject);
     }
 
     public void UpdateNetworkObjectPosition(int clientId, Vector3 pos)

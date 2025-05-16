@@ -5,7 +5,7 @@ namespace MultiplayerLib.Game;
 
 public class Bullet : NetworkObject
 {
-    public Bullet(Vector3 position, NetObjectTypes prefabType)
+    public Bullet(Vector3 position, NetObjectTypes prefabType, int color)
     {
         PrefabType = prefabType;
         CurrentPos = position;
@@ -17,4 +17,5 @@ public class Bullet : NetworkObject
     public NetObjectTypes PrefabType { get; set; }
     public Vector3 LastUpdatedPos { get; set; }
     public Vector3 CurrentPos { get; set; }
+    public int Color { get; set; }
 }

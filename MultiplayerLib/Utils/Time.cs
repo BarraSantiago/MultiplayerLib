@@ -2,5 +2,7 @@ namespace MultiplayerLib.Utils;
 
 public static class Time
 {
-    public static long CurrentTime => DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+    private static readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+    public static float CurrentTime => (float)_stopwatch.Elapsed.TotalSeconds;
 }

@@ -80,7 +80,7 @@ public class MatchmakerServer
             try
             {
                 // Check for timed-out clients
-                long currentTime = Time.CurrentTime;
+                float currentTime = Time.CurrentTime;
                 List<Client> timedOutClients = _connectedClients.Values
                     .Where(client => currentTime - client.LastHeartbeatTime > clientTimeoutMs)
                     .ToList();

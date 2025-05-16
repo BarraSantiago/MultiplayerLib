@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Numerics;
 using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
@@ -139,13 +138,6 @@ public class ServerNetworkManager : AbstractNetworkManager
             _lastTimeoutCheck = currentTime;
         }
 
-        foreach (KeyValuePair<int, NetworkObject> valuePair in NetworkObjectFactory.Instance.GetAllNetworkObjects())
-        {
-            if (Approximately(valuePair.Value.LastUpdatedPos, valuePair.Value.CurrentPos)) return;
-            valuePair.Value.LastUpdatedPos = valuePair.Value.CurrentPos;
-            SerializedBroadcast(valuePair.Value.LastUpdatedPos, MessageType.Position, valuePair.Key);
-        }
-
         if (!(currentTime - _lastPingBroadcastTime > PingBroadcastInterval)) return;
         BroadcastPlayerPings();
         _lastPingBroadcastTime = currentTime;
@@ -193,10 +185,5 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
 
         base.Dispose();
-    }
-
-    private bool Approximately(Vector3 a, Vector3 b)
-    {
-        return Math.Abs(a.X - b.X) < 0.01f && Math.Abs(a.Y - b.Y) < 0.01f && Math.Abs(a.Z - b.Z) < 0.01f;
     }
 }

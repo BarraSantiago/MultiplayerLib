@@ -104,8 +104,8 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
 
             Vector3 position = _netVector3.Deserialize(data);
             int objectId = _netVector3.GetId(data);
-
-            NetworkObjectFactory.Instance.GetAllNetworkObjects()[objectId].CurrentPos = position;
+    
+            NetworkObjectFactory.Instance.UpdateObjectPosition(objectId, position);
         }
         catch (Exception ex)
         {

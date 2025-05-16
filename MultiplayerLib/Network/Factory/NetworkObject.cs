@@ -10,6 +10,7 @@ public interface NetworkObject
     public NetObjectTypes PrefabType { get; set; }
     public Vector3 LastUpdatedPos { get; set; }
     public Vector3 CurrentPos { get; set; }
+    public int Color { get; set; }
 
     public virtual void Initialize(int networkId, bool isOwner, NetObjectTypes prefabType)
     {

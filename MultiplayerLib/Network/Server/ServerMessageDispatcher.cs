@@ -60,24 +60,14 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         try
         {
             PlayerData pData = _netHandShake.Deserialize(data);
-            Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
             NetworkObject pObject = CreateNetworkObject(Vector3.Zero, NetObjectTypes.Player, pData.Color);
             int clientId = _clientManager.AddClient(ip, pObject.NetworkId);
             
             ClientColor[clientId] = pData.Color;
             _clientManager.UpdateClientTimestamp(clientId);
-
-            ServerNetworkManager.OnSerializedBroadcast.Invoke(Vector3.Zero, MessageType.HandShake, clientId);
-            Dictionary<int, Vector3> players = new Dictionary<int, Vector3>();
-            foreach (NetworkObject netObj in NetworkObjectFactory.Instance.GetAllNetworkObjects().Values)
-            {
-                players.Add(netObj.NetworkId, netObj.CurrentPos);
-            }
-
-            _netPlayers.Data = players;
+            Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
             SendObjectsToClient(ip, networkObjects);
-            byte[] msg = ConvertToEnvelope(_netPlayers.Serialize(), MessageType.HandShake, ip, true);
-            ServerNetworkManager.OnSendToClient?.Invoke(clientId, msg, MessageType.HandShake, true);
+            
             Console.WriteLine($"[ServerMessageDispatcher] New client {clientId} connected from {ip}");
         }
         catch (Exception ex)
@@ -98,12 +88,12 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
                 NetworkId = networkObject.NetworkId,
                 PrefabType = networkObject.PrefabType,
                 Position = networkObject.CurrentPos,
+                Color = networkObject.Color
             };
 
 
-            byte[] msg = ConvertToEnvelope(_netCreateObject.Serialize(createMsg), MessageType.ObjectCreate, ip, true);
             _clientManager.TryGetClientId(ip, out int clientId);
-            ServerNetworkManager.OnSendToClient?.Invoke(clientId, msg, MessageType.ObjectCreate, false);
+            ServerNetworkManager.OnSendToClient?.Invoke(clientId, createMsg, MessageType.ObjectCreate, false);
         }
     }
 
@@ -128,7 +118,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            if (data == null || data.Length < sizeof(float) * 3)
+            if (data == null)
             {
                 Console.WriteLine("[ServerMessageDispatcher] Invalid position data received");
                 return;
@@ -192,7 +182,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     {
         try
         {
-            if (arg1 == null || arg1.Length < sizeof(float) * 3)
+            if (arg1 == null)
             {
                 Console.WriteLine("[ServerMessageDispatcher] Invalid player input data received");
                 return;
@@ -245,7 +235,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             Position = networkObject.CurrentPos,
             Color = color
         };
-        ServerNetworkManager.OnSerializedBroadcast.Invoke(createMsg, MessageType.ObjectCreate, -1);
+        ServerNetworkManager.OnSerializedBroadcast.Invoke(createMsg, MessageType.ObjectCreate, networkObject.NetworkId);
 
         return networkObject;
     }
