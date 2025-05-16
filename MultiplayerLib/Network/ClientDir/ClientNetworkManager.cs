@@ -15,18 +15,34 @@ public class ClientNetworkManager : AbstractNetworkManager
 {
     private IPEndPoint _serverEndpoint;
     public float ServerTimeout = 3;
+
     private float _lastServerPingTime;
+
     //TODO update ms text
     //[SerializeField] private TMP_Text heartbeatText;
-
+    private Dictionary<MessageType, Dictionary<int, byte[]>> _sentMessages = new();
     public IPAddress ServerIPAddress { get; private set; }
     public static Action<object, MessageType, bool> OnSendToServer;
+    public static int ClientId { get; private set; } = -1;
+
+    public void Init()
+    {
+        _lastServerPingTime = Time.CurrentTime;
+        _messageSequenceTracker.InitializeClient(ClientId);
+
+        foreach (MessageType type in Enum.GetValues(typeof(MessageType)))
+        {
+            _sentMessages[type] = new Dictionary<int, byte[]>();
+        }
+    }
+
 
     public void StartClient(IPAddress ip, int port, string pName, int color)
     {
         ServerIPAddress = ip;
         Port = port;
         OnSendToServer += SendToServer;
+        _messageDispatcher.OnUpdatePing += UpdateServerPingTime;
         ClientMessageDispatcher.OnServerDisconnect += Dispose;
         _lastServerPingTime = Time.CurrentTime;
         try
@@ -50,15 +66,7 @@ public class ClientNetworkManager : AbstractNetworkManager
             throw;
         }
     }
-    
-    public override void Tick()
-    {
-        base.Tick();
-        
-        if (_disposed) return;
-        CheckServerTimeout();
-    }
-    
+
     public void SendToServer(object data, MessageType messageType, bool isImportant = false)
     {
         try
@@ -86,20 +94,52 @@ public class ClientNetworkManager : AbstractNetworkManager
         }
     }
 
-    public override void SendMessage(byte[] data, IPEndPoint ipEndPoint)
-    {
-        _connection.Send(data);
-    }
-    
-    public override void OnReceiveData(byte[] data, IPEndPoint ip)
+    public override void OnReceiveData(byte[] data, IPEndPoint serverEndpoint)
     {
         try
         {
-            MessageType messageType = _messageDispatcher.TryDispatchMessage(data, ip);
-            
-            if (messageType == MessageType.Ping)
+            MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
+
+            if (envelope.MessageType == MessageType.Ping)
             {
                 UpdateServerPingTime();
+                _messageDispatcher.TryDispatchMessage(data,envelope.MessageNumber, serverEndpoint);
+                return;
+            }
+
+            if (envelope.MessageType == MessageType.RequestResend)
+            {
+                HandleResendRequest(envelope.Data, serverEndpoint);
+                return;
+            }
+
+            bool inSequence = _messageSequenceTracker.CheckMessageSequence(ClientId, envelope.MessageType,
+                envelope.MessageNumber, envelope.Data, out List<byte[]> messagesToProcess);
+
+            if (!inSequence && envelope.IsImportant)
+            {
+                List<int> missingNumbers = _messageSequenceTracker.GetMissingMessageNumbers(
+                    ClientId, envelope.MessageType);
+
+                if (missingNumbers.Count > 0)
+                {
+                    Console.WriteLine(
+                        $"[ClientNetworkManager] Detected gap in message sequence for type {envelope.MessageType}. Missing: {string.Join(", ", missingNumbers)}");
+                }
+            }
+
+            foreach (byte[] messageData in messagesToProcess)
+            {
+                MessageEnvelope dataEnvelope = new MessageEnvelope
+                {
+                    MessageType = envelope.MessageType,
+                    Data = messageData
+                };
+
+                if (_messageDispatcher is ClientMessageDispatcher clientDispatcher)
+                {
+                    clientDispatcher.HandleMessageData(dataEnvelope, serverEndpoint);
+                }
             }
         }
         catch (Exception ex)
@@ -107,20 +147,109 @@ public class ClientNetworkManager : AbstractNetworkManager
             Console.WriteLine($"[ClientNetworkManager] Error processing data: {ex.Message}");
         }
     }
+
+    private void HandleResendRequest(byte[] data, IPEndPoint serverEndpoint)
+    {
+        try
+        {
+            int offset = 0;
+            MessageType requestedType = (MessageType)BitConverter.ToInt32(data, offset);
+            offset += 4;
+
+            int count = BitConverter.ToInt32(data, offset);
+            offset += 4;
+
+            Console.WriteLine(
+                $"[ClientNetworkManager] Server requested resend of {count} messages of type {requestedType}");
+
+            for (int i = 0; i < count; i++)
+            {
+                int messageNumber = BitConverter.ToInt32(data, offset);
+                offset += 4;
+
+                if (_sentMessages.TryGetValue(requestedType, out var messageDict) &&
+                    messageDict.TryGetValue(messageNumber, out byte[] storedMessage))
+                {
+                    SendMessage(storedMessage, serverEndpoint);
+                    Console.WriteLine(
+                        $"[ClientNetworkManager] Resending message {messageNumber} of type {requestedType}");
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"[ClientNetworkManager] Requested message {messageNumber} of type {requestedType} not found in cache");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ClientNetworkManager] Error handling resend request: {ex.Message}");
+        }
+    }
+
+    public override void SendMessage(byte[] data, IPEndPoint target)
+    {
+        try
+        {
+            MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
+            if (envelope.IsImportant)
+            {
+                _sentMessages[envelope.MessageType][envelope.MessageNumber] = data;
+            }
+
+            base.SendMessage(data, target);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ClientNetworkManager] Error storing sent message: {ex.Message}");
+            base.SendMessage(data, target);
+        }
+    }
+
+    public override void Tick()
+    {
+        base.Tick();
+
+        if (_disposed) return;
+
+        CheckServerTimeout();
+        CleanupOldMessages();
+    }
+
+    private void CleanupOldMessages()
+    {
+        const int MAX_MESSAGES_TO_KEEP = 100;
+
+        foreach (var messageType in _sentMessages.Keys)
+        {
+            var messages = _sentMessages[messageType];
+            if (messages.Count > MAX_MESSAGES_TO_KEEP)
+            {
+                var keysToRemove = messages.Keys.OrderBy(k => k).Take(messages.Count - MAX_MESSAGES_TO_KEEP);
+                foreach (var key in keysToRemove.ToList())
+                {
+                    messages.Remove(key);
+                }
+            }
+        }
+    }
+
     public void UpdateServerPingTime()
     {
         _lastServerPingTime = Time.CurrentTime;
     }
-    
+
     private void CheckServerTimeout()
     {
         float currentTime = Time.CurrentTime;
         if (currentTime - _lastServerPingTime > ServerTimeout)
         {
-            Console.WriteLine("[ClientNetworkManager] Server timeout detected. No ping received in the last 3 seconds.");
+            Console.WriteLine(
+                "[ClientNetworkManager] Server timeout detected. No ping received in the last 3 seconds.");
             Dispose();
         }
     }
+
     public override void Dispose()
     {
         if (_disposed) return;

@@ -14,7 +14,8 @@ public enum MessageType
     ObjectUpdate,
     Disconnect,
     PingBroadcast,
-    HandShakeResponse
+    HandShakeResponse,
+    RequestResend
 }
 
 public interface IMessage<T>

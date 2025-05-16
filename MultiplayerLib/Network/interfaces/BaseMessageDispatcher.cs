@@ -13,7 +13,7 @@ public abstract class BaseMessageDispatcher
 {
     protected const float ResendInterval = .1f;
     public static Action<string> OnConsoleMessageReceived;
-    protected readonly Dictionary<MessageType, Action<byte[], IPEndPoint>> _messageHandlers;
+    protected readonly Dictionary<MessageType, Action<byte[], int, IPEndPoint>> _messageHandlers;
     protected readonly NetCreateObject _netCreateObject = new();
     protected readonly NetHandShake _netHandShake = new();
     protected readonly NetPingBroadcast _netPingBroadcast = new();
@@ -24,13 +24,14 @@ public abstract class BaseMessageDispatcher
     
     public readonly MessageTracker MessageTracker = new();
 
+    public Action OnUpdatePing;
     protected float _currentLatency = 0;
     protected float _lastPing;
     protected float _lastResendCheckTime;
 
     protected BaseMessageDispatcher()
     {
-        _messageHandlers = new Dictionary<MessageType, Action<byte[], IPEndPoint>>();
+        _messageHandlers = new Dictionary<MessageType, Action<byte[], int, IPEndPoint>>();
         InitializeMessageHandlers();
         InitializeAcknowledgmentHandler();
     }
@@ -41,7 +42,7 @@ public abstract class BaseMessageDispatcher
 
     protected void InitializeAcknowledgmentHandler()
     {
-        _messageHandlers[MessageType.Acknowledgment] = (data, ip) =>
+        _messageHandlers[MessageType.Acknowledgment] = (data,num, ip) =>
         {
             int offset = 0;
             MessageType ackedType = (MessageType)BitConverter.ToInt32(data, offset);
@@ -52,7 +53,7 @@ public abstract class BaseMessageDispatcher
         };
     }
 
-    public MessageType TryDispatchMessage(byte[] data, IPEndPoint ip)
+    public virtual MessageType TryDispatchMessage(byte[] data, int envelopeMessageNumber, IPEndPoint ip)
     {
         try
         {
@@ -67,9 +68,9 @@ public abstract class BaseMessageDispatcher
 
             if (envelope.IsImportant) SendAcknowledgment(envelope.MessageType, envelope.MessageNumber, ip);
 
-            if (_messageHandlers.TryGetValue(envelope.MessageType, out Action<byte[], IPEndPoint>? handler))
+            if (_messageHandlers.TryGetValue(envelope.MessageType, out Action<byte[], int, IPEndPoint>? handler))
             {
-                handler(envelope.Data, ip);
+                handler(envelope.Data, envelopeMessageNumber, ip);
                 return envelope.MessageType;
             }
 

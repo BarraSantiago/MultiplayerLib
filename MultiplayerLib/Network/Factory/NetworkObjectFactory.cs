@@ -124,7 +124,7 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
     public void SyncPositions()
     {
         float threshold = 0.0001f;
-        foreach (var kvp in _networkObjects)
+        foreach (KeyValuePair<int, NetworkObject> kvp in _networkObjects)
         {
             NetworkObject networkObject = kvp.Value;
             float deltaSquared = Vector3.DistanceSquared(networkObject.CurrentPos, networkObject.LastUpdatedPos);

@@ -179,7 +179,7 @@ public class MatchmakerServer
 
                 case "servers":
                     Console.WriteLine($"Active servers: {_activeServers.Count}");
-                    foreach (var kvp in _activeServers)
+                    foreach (KeyValuePair<int, Process> kvp in _activeServers)
                     {
                         Console.WriteLine($"  Server #{kvp.Key}, Process ID: {kvp.Value.Id}");
                     }

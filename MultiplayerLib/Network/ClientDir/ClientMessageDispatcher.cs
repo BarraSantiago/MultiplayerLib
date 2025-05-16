@@ -13,9 +13,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
     public static Action<object, MessageType, bool> OnSendToServer;
     public static Action OnServerDisconnect;
     public int ClientId { get; private set; } = -1;
-    public ClientMessageDispatcher()
-    {
-    }
+    private Dictionary<MessageType, int> MessageSequenceTracker = new();
 
     protected override void InitializeMessageHandlers()
     {
@@ -31,13 +29,44 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         _messageHandlers[MessageType.Disconnect] = HandleDisconnect;
     }
 
-    private void HandleDisconnect(byte[] arg1, IPEndPoint arg2)
+    public void HandleMessageData(MessageEnvelope envelope, IPEndPoint serverEndpoint)
+    {
+        try
+        {
+            if (envelope == null || serverEndpoint == null)
+            {
+                Console.WriteLine("[ClientMessageDispatcher] Null envelope or server endpoint received");
+                return;
+            }
+
+            MessageType messageType = envelope.MessageType;
+            byte[] data = envelope.Data;
+
+            Console.WriteLine($"[ClientMessageDispatcher] Processing in-sequence message type {messageType}");
+
+            if (_messageHandlers.TryGetValue(messageType, out var handler))
+            {
+                OnUpdatePing?.Invoke();
+                handler(data, envelope.MessageNumber, serverEndpoint);
+            }
+            else
+            {
+                Console.WriteLine($"[ClientMessageDispatcher] No handler registered for message type {messageType}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ClientMessageDispatcher] Error handling message data: {ex.Message}");
+        }
+    }
+
+    private void HandleDisconnect(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         MessageTracker.Clear();
         OnServerDisconnect?.Invoke();
     }
 
-    private void HandlePingBroadcast(byte[] arg1, IPEndPoint arg2)
+    private void HandlePingBroadcast(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         try
         {
@@ -46,7 +75,11 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
                 Console.WriteLine("[ClientMessageDispatcher] Invalid ping broadcast data");
                 return;
             }
-
+            if(MessageSequenceTracker[MessageType.PingBroadcast] > messageNum)
+            {
+                return;
+            }
+            MessageSequenceTracker[MessageType.PingBroadcast] = messageNum;
             (int, float)[] pingData = _netPingBroadcast.Deserialize(arg1);
             foreach ((int, float) data in pingData)
             {
@@ -60,7 +93,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleAcknowledgment(byte[] arg1, IPEndPoint arg2)
+    private void HandleAcknowledgment(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         MessageType ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
         int ackedNumber = BitConverter.ToInt32(arg1, 4);
@@ -68,17 +101,17 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         MessageTracker.ConfirmMessage(arg2, ackedType, ackedNumber);
     }
 
-    private void HandleHandshake(byte[] data, IPEndPoint ip)
+    private void HandleHandshake(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
             HandshakeResponse response = _netHandshakeResponse.Deserialize(data);
             ClientId = response.ClientId;
-    
-            MessageEnvelope.SetSecuritySeed(response.SecuritySeed);
-    
-            Console.WriteLine($"[ClientNetworkManager] Connected to server. Client ID: {ClientId}, Security Seed: {response.SecuritySeed}");
 
+            MessageEnvelope.SetSecuritySeed(response.SecuritySeed);
+
+            Console.WriteLine(
+                $"[ClientNetworkManager] Connected to server. Client ID: {ClientId}, Security Seed: {response.SecuritySeed}");
         }
         catch (Exception ex)
         {
@@ -86,7 +119,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleConsoleMessage(byte[] data, IPEndPoint ip)
+    private void HandleConsoleMessage(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -100,7 +133,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandlePositionUpdate(byte[] data, IPEndPoint ip)
+    private void HandlePositionUpdate(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -109,10 +142,14 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
                 Console.WriteLine("[ClientMessageDispatcher] Invalid position data received");
                 return;
             }
-
+            if(MessageSequenceTracker[MessageType.Position] > messageNum)
+            {
+                return;
+            }
+            MessageSequenceTracker[MessageType.Position] = messageNum;
             Vector3 position = _netVector3.Deserialize(data);
             int objectId = _netVector3.GetId(data);
-    
+
             NetworkObjectFactory.Instance.UpdateObjectPosition(objectId, position);
         }
         catch (Exception ex)
@@ -121,12 +158,12 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandlePing(byte[] data, IPEndPoint ip)
+    private void HandlePing(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
             _currentLatency = (Time.CurrentTime - _lastPing) * 1000;
-            _lastPing = Time.CurrentTime;;
+            _lastPing = Time.CurrentTime;
 
             OnSendToServer?.Invoke(null, MessageType.Ping, false);
         }
@@ -136,7 +173,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleObjectCreate(byte[] data, IPEndPoint ip)
+    private void HandleObjectCreate(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -150,7 +187,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleObjectDestroy(byte[] data, IPEndPoint ip)
+    private void HandleObjectDestroy(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -163,14 +200,13 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleObjectUpdate(byte[] data, IPEndPoint ip)
+    private void HandleObjectUpdate(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
             int networkId = BitConverter.ToInt32(data, 0);
             MessageType objectMessageType = (MessageType)BitConverter.ToInt32(data, 4);
 
-            // Get the payload (skip first 8 bytes)
             byte[] payload = new byte[data.Length - 8];
             Array.Copy(data, 8, payload, 0, payload.Length);
 

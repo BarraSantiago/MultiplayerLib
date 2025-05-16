@@ -16,8 +16,8 @@ public class HandshakeResponse
 public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 {
     private ClientManager _clientManager;
-    private Dictionary<int, int> ClientIdToObjectId = new Dictionary<int, int>();
-    private Dictionary<int, int> ClientColor = new Dictionary<int, int>();
+    private readonly Dictionary<int, int> _clientColor = new Dictionary<int, int>();
+    public Action<int> OnNewClient;
     public ServerMessageDispatcher(ClientManager clientManager)
     {
         _clientManager = clientManager;
@@ -37,7 +37,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         _messageHandlers[MessageType.Disconnect] = HandleDisconnect;
     }
 
-    public void HandleDisconnect(byte[] arg1, IPEndPoint arg2)
+    public void HandleDisconnect(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         if (!_clientManager.TryGetClientId(arg2, out int clientId))
         {
@@ -51,7 +51,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         ServerNetworkManager.OnSerializedBroadcast.Invoke(clientId, MessageType.ObjectDestroy, clientId);
     }
 
-    private void HandleAcknowledgment(byte[] arg1, IPEndPoint arg2)
+    private void HandleAcknowledgment(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         MessageType ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
         int ackedNumber = BitConverter.ToInt32(arg1, 4);
@@ -60,15 +60,16 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     }
 
 
-    private void HandleHandshake(byte[] data, IPEndPoint ip)
+    private void HandleHandshake(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
             PlayerData pData = _netHandShake.Deserialize(data);
             NetworkObject pObject = CreateNetworkObject(Vector3.Zero, NetObjectTypes.Player, pData.Color);
             int clientId = _clientManager.AddClient(ip, pObject.NetworkId);
+            OnNewClient?.Invoke(clientId);
             
-            ClientColor[clientId] = pData.Color;
+            _clientColor[clientId] = pData.Color;
             _clientManager.UpdateClientTimestamp(clientId);
             Dictionary<int, NetworkObject> networkObjects = NetworkObjectFactory.Instance.GetAllNetworkObjects();
             
@@ -110,7 +111,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleConsoleMessage(byte[] data, IPEndPoint ip)
+    private void HandleConsoleMessage(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -127,7 +128,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandlePositionUpdate(byte[] data, IPEndPoint ip)
+    private void HandlePositionUpdate(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -157,7 +158,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
     protected abstract void UpdatePlayerPosition(int clientId, Vector3 position);
 
-    private void HandlePing(byte[] data, IPEndPoint ip)
+    private void HandlePing(byte[] data, int messageNum, IPEndPoint ip)
     {
         try
         {
@@ -176,22 +177,23 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
     }
 
-    private void HandleObjectDestroy(byte[] arg1, IPEndPoint arg2)
+    private void HandleObjectDestroy(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         throw new NotImplementedException();
     }
 
-    private void HandleObjectUpdate(byte[] arg1, IPEndPoint arg2)
+    private void HandleObjectUpdate(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         throw new NotImplementedException();
     }
 
-    private void HandleObjectCreate(byte[] arg1, IPEndPoint arg2)
+    private void HandleObjectCreate(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         throw new NotImplementedException();
     }
 
-    private void HandlePlayerInput(byte[] arg1, IPEndPoint arg2)
+    private Dictionary<IPEndPoint, int> SequenceTracker = new();
+    private void HandlePlayerInput(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         try
         {
@@ -200,7 +202,11 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
                 Console.WriteLine("[ServerMessageDispatcher] Invalid player input data received");
                 return;
             }
-
+            if(SequenceTracker[arg2] > messageNum)
+            {
+                return;
+            }
+            SequenceTracker[arg2] = messageNum;
             PlayerInput input = _netPlayerInput.Deserialize(arg1);
 
             if (!_clientManager.TryGetClientId(arg2, out int clientId))
@@ -212,14 +218,14 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
             UpdatePlayerInput(clientId, input);
 
-            Vector3 pos = NetworkObjectFactory.Instance.GetNetworkObject(ClientIdToObjectId[clientId]).CurrentPos;
+            Vector3 pos = NetworkObjectFactory.Instance.GetNetworkObject(clientId).CurrentPos;
             NetworkObjectFactory.Instance.UpdateNetworkObjectPosition(clientId, pos);
 
             if (input.IsShooting)
             {
                 NetworkObject bullet =
                     NetworkObjectFactory.Instance.CreateNetworkObject(pos, NetObjectTypes.Projectile,
-                        ClientColor[clientId]);
+                        _clientColor[clientId]);
                 NetworkObjectCreateMessage createMsg = new NetworkObjectCreateMessage
                 {
                     NetworkId = bullet.NetworkId,
@@ -254,4 +260,42 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     }
 
     protected abstract void UpdatePlayerInput(int clientId, PlayerInput input);
+
+    public void HandleMessageData(MessageEnvelope envelope, IPEndPoint ip)
+    {
+        try
+        {
+            if (envelope == null || ip == null)
+            {
+                Console.WriteLine("[ServerMessageDispatcher] Null envelope or IP received");
+                return;
+            }
+
+            MessageType messageType = envelope.MessageType;
+            byte[] data = envelope.Data;
+
+            if (_clientManager.TryGetClientId(ip, out int clientId))
+            {
+                Console.WriteLine($"[ServerMessageDispatcher] Processing in-sequence message type {messageType} from client {clientId}");
+            }
+
+            if (_messageHandlers.TryGetValue(messageType, out var handler))
+            {
+                if (clientId != -1)
+                {
+                    _clientManager.UpdateClientTimestamp(clientId);
+                }
+
+                handler(data, envelope.MessageNumber, ip);
+            }
+            else
+            {
+                Console.WriteLine($"[ServerMessageDispatcher] No handler registered for message type {messageType}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ServerMessageDispatcher] Error handling message data from {ip}: {ex.Message}");
+        }
+    }
 }

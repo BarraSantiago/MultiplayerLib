@@ -11,6 +11,7 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
     protected UdpConnection _connection;
     protected bool _disposed;
     public BaseMessageDispatcher _messageDispatcher;
+    protected MessageSequenceTracker _messageSequenceTracker = new MessageSequenceTracker();
 
     public int Port { get; protected set; }
     
@@ -37,7 +38,7 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
     {
         try
         {
-            _messageDispatcher.TryDispatchMessage(data, ip);
+            _messageDispatcher.TryDispatchMessage(data, 0, ip);
         }
         catch (Exception ex)
         {
