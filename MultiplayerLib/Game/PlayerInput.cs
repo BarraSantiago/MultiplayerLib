@@ -4,7 +4,7 @@ namespace MultiplayerLib.Game;
 
 public struct PlayerInput
 {
-    public Vector2 MoveDirection;
+    public float xMovement;
     public bool IsShooting;
     public bool IsJumping;
     public bool IsCrouching;

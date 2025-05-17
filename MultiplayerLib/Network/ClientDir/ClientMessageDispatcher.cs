@@ -17,7 +17,12 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
 
     protected override void InitializeMessageHandlers()
     {
+        foreach (MessageType type in Enum.GetValues(typeof(MessageType)))
+        {
+            MessageSequenceTracker[type] = -1;
+        }
         _messageHandlers[MessageType.HandShake] = HandleHandshake;
+        _messageHandlers[MessageType.HandShakeResponse] = HandleHandshakeResponse;
         _messageHandlers[MessageType.Console] = HandleConsoleMessage;
         _messageHandlers[MessageType.Position] = HandlePositionUpdate;
         _messageHandlers[MessageType.Ping] = HandlePing;
@@ -29,34 +34,49 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         _messageHandlers[MessageType.Disconnect] = HandleDisconnect;
     }
 
+    private void HandleHandshakeResponse(byte[] arg1, int arg2, IPEndPoint arg3)
+    {
+        try
+        {
+            HandshakeResponse response = _netHandshakeResponse.Deserialize(arg1);
+            ClientId = response.ClientId;
+
+            MessageEnvelope.SetSecuritySeed(response.SecuritySeed);
+
+            ConsoleMessages.Log(
+                $"[ClientNetworkManager] Connected to server. Client ID: {ClientId}, Security Seed: {response.SecuritySeed}");
+        }
+        catch (Exception ex)
+        {
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandleHandshakeResponse: {ex.Message}");
+        }
+    }
+
     public void HandleMessageData(MessageEnvelope envelope, IPEndPoint serverEndpoint)
     {
         try
         {
             if (envelope == null || serverEndpoint == null)
             {
-                Console.WriteLine("[ClientMessageDispatcher] Null envelope or server endpoint received");
+                ConsoleMessages.Log("[ClientMessageDispatcher] Null envelope or server endpoint received");
                 return;
             }
 
             MessageType messageType = envelope.MessageType;
             byte[] data = envelope.Data;
-
-            Console.WriteLine($"[ClientMessageDispatcher] Processing in-sequence message type {messageType}");
-
+            
             if (_messageHandlers.TryGetValue(messageType, out var handler))
             {
-                OnUpdatePing?.Invoke();
                 handler(data, envelope.MessageNumber, serverEndpoint);
             }
             else
             {
-                Console.WriteLine($"[ClientMessageDispatcher] No handler registered for message type {messageType}");
+                ConsoleMessages.Log($"[ClientMessageDispatcher] No handler registered for message type {messageType}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error handling message data: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error handling message data: {ex.Message}");
         }
     }
 
@@ -72,7 +92,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         {
             if (arg1 == null || arg1.Length < 4)
             {
-                Console.WriteLine("[ClientMessageDispatcher] Invalid ping broadcast data");
+                ConsoleMessages.Log("[ClientMessageDispatcher] Invalid ping broadcast data");
                 return;
             }
             if(MessageSequenceTracker[MessageType.PingBroadcast] > messageNum)
@@ -89,16 +109,16 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandlePingBroadcast: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandlePingBroadcast: {ex.Message}");
         }
     }
 
     private void HandleAcknowledgment(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
-        MessageType ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
-        int ackedNumber = BitConverter.ToInt32(arg1, 4);
+        AcknowledgeMessage message = _netAcknowledge.Deserialize(arg1);
 
-        MessageTracker.ConfirmMessage(arg2, ackedType, ackedNumber);
+
+        MessageTracker.ConfirmMessage(arg2, message.MessageType, message.MessageNumber);
     }
 
     private void HandleHandshake(byte[] data, int messageNum, IPEndPoint ip)
@@ -110,12 +130,12 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
 
             MessageEnvelope.SetSecuritySeed(response.SecuritySeed);
 
-            Console.WriteLine(
+            ConsoleMessages.Log(
                 $"[ClientNetworkManager] Connected to server. Client ID: {ClientId}, Security Seed: {response.SecuritySeed}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandleHandshake: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandleHandshake: {ex.Message}");
         }
     }
 
@@ -125,11 +145,11 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         {
             string message = _netString.Deserialize(data);
             OnConsoleMessageReceived?.Invoke(message);
-            Console.WriteLine($"[ClientMessageDispatcher] Console message received: {message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Console message received: {message}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandleConsoleMessage: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandleConsoleMessage: {ex.Message}");
         }
     }
 
@@ -139,7 +159,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         {
             if (data == null || data.Length < sizeof(float) * 3)
             {
-                Console.WriteLine("[ClientMessageDispatcher] Invalid position data received");
+                ConsoleMessages.Log("[ClientMessageDispatcher] Invalid position data received");
                 return;
             }
             if(MessageSequenceTracker[MessageType.Position] > messageNum)
@@ -154,7 +174,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandlePositionUpdate: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandlePositionUpdate: {ex.Message}");
         }
     }
 
@@ -169,7 +189,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandlePing: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandlePing: {ex.Message}");
         }
     }
 
@@ -183,7 +203,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandleObjectCreate: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandleObjectCreate: {ex.Message}");
         }
     }
 
@@ -196,7 +216,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandleObjectDestroy: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandleObjectDestroy: {ex.Message}");
         }
     }
 
@@ -215,7 +235,7 @@ public class ClientMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientMessageDispatcher] Error in HandleObjectUpdate: {ex.Message}");
+            ConsoleMessages.Log($"[ClientMessageDispatcher] Error in HandleObjectUpdate: {ex.Message}");
         }
     }
 }

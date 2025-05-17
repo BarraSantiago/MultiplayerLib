@@ -28,7 +28,7 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[NetworkManager] Disposal error: {e.Message}");
+            ConsoleMessages.Log($"[NetworkManager] Disposal error: {e.Message}");
         }
 
         _disposed = true;
@@ -42,7 +42,7 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NetworkManager] Error processing data from {ip}: {ex.Message}");
+            ConsoleMessages.Log($"[NetworkManager] Error processing data from {ip}: {ex.Message}");
         }
     }
 
@@ -54,7 +54,7 @@ public abstract class AbstractNetworkManager : Singleton<AbstractNetworkManager>
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[NetworkManager] Send failed: {e.Message}");
+            ConsoleMessages.Log($"[NetworkManager] Send failed: {e.Message}");
         }
     }
 

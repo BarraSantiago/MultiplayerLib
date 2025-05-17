@@ -43,7 +43,7 @@ public class ClientManager
         _clients[id] = newClient;
 
         OnClientConnected?.Invoke(id);
-        Console.WriteLine($"[ClientManager] Client added: {endpoint.Address}, ID: {id}");
+        ConsoleMessages.Log($"[ClientManager] Client added: {endpoint.Address}, ID: {id}");
 
         return id;
     }
@@ -77,7 +77,7 @@ public class ClientManager
             if (currentTime - client.Value.LastHeartbeatTime <= timeout) continue;
 
             timedOut.Add(client.Value.ipEndPoint);
-            Console.WriteLine($"[ClientManager] Client {client.Key} timed out");
+            ConsoleMessages.Log($"[ClientManager] Client {client.Key} timed out");
         }
 
         return timedOut;

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using MultiplayerLib.Network.interfaces;
+using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network;
 
@@ -63,12 +64,12 @@ public class UdpConnection
         catch (SocketException e)
         {
             // Client disconnection.
-            Console.WriteLine("[UdpConnection] " + e.Message);
+            ConsoleMessages.Log("[UdpConnection] " + e.Message);
         }
         catch (Exception e)
         {
             // Handle any other unexpected exceptions
-            Console.WriteLine("[UdpConnection] Unexpected error: " + e.Message);
+            ConsoleMessages.Log("[UdpConnection] Unexpected error: " + e.Message);
         }
         finally
         {
@@ -78,7 +79,7 @@ public class UdpConnection
             }
             catch (Exception e)
             {
-                Console.WriteLine("[UdpConnection] Failed to continue receive loop: " + e.Message);
+                ConsoleMessages.Log("[UdpConnection] Failed to continue receive loop: " + e.Message);
             }
         }
     }

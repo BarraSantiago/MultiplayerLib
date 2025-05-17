@@ -21,10 +21,11 @@ public abstract class BaseMessageDispatcher
     protected readonly NetString _netString = new();
     protected readonly NetVector3 _netVector3 = new();
     protected readonly NetHandshakeResponse _netHandshakeResponse = new();
+    protected readonly NetAcknowledge _netAcknowledge = new();
+    
     
     public readonly MessageTracker MessageTracker = new();
 
-    public Action OnUpdatePing;
     protected float _currentLatency = 0;
     protected float _lastPing;
     protected float _lastResendCheckTime;
@@ -59,7 +60,7 @@ public abstract class BaseMessageDispatcher
         {
             if (data == null)
             {
-                Console.WriteLine(
+                ConsoleMessages.Log(
                     $"[MessageDispatcher] Dropped malformed packet from {ip}: insufficient data length ({data?.Length ?? 0} bytes)");
                 return MessageType.None;
             }
@@ -79,7 +80,7 @@ public abstract class BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[MessageDispatcher] Error dispatching message: {ex.Message}");
+            ConsoleMessages.Log($"[MessageDispatcher] Error dispatching message: {ex.Message}");
             return MessageType.None;
         }
     }
@@ -94,7 +95,7 @@ public abstract class BaseMessageDispatcher
     }
 
     public byte[] ConvertToEnvelope(byte[] data, MessageType messageType, IPEndPoint target, bool isImportant,
-        bool isCritical = false)
+        bool isCritical = false, bool isSortable = false)
     {
         int messageNumber = MessageTracker.GetNextMessageNumber(messageType);
 
@@ -104,6 +105,7 @@ public abstract class BaseMessageDispatcher
             MessageType = messageType,
             MessageNumber = messageNumber,
             IsImportant = isImportant,
+            IsSortable = isSortable,
             Data = data
         };
 
@@ -116,7 +118,7 @@ public abstract class BaseMessageDispatcher
     }
 
     public virtual void SendMessage(byte[] data, MessageType messageType, IPEndPoint target, bool isImportant,
-        bool isCritical = false)
+        bool isCritical = false, bool isSortable = false)
     {
         int messageNumber = MessageTracker.GetNextMessageNumber(messageType);
 
@@ -126,6 +128,7 @@ public abstract class BaseMessageDispatcher
             MessageType = messageType,
             MessageNumber = messageNumber,
             IsImportant = isImportant,
+            IsSortable = isSortable,
             Data = data
         };
 
@@ -135,7 +138,7 @@ public abstract class BaseMessageDispatcher
 
         if (target == null)
         {
-            Console.WriteLine("[MessageDispatcher] Target endpoint is null");
+            ConsoleMessages.Log("[MessageDispatcher] Target endpoint is null");
             return;
         }
 
@@ -180,11 +183,9 @@ public abstract class BaseMessageDispatcher
                 return null;
 
             case MessageType.Acknowledgment:
-                if (data is int ackedNumber)
+                if (data is AcknowledgeMessage ackedMessage)
                 {
-                    byte[] ackData = new byte[4];
-                    Buffer.BlockCopy(BitConverter.GetBytes(ackedNumber), 0, ackData, 0, 4);
-                    return ackData;
+                    return _netAcknowledge.Serialize(ackedMessage);
                 }
                 throw new ArgumentException("Data must be int for Acknowledgment messages");
 
@@ -222,7 +223,7 @@ public abstract class BaseMessageDispatcher
                 {
                     AbstractNetworkManager.Instance.SendMessage(message.Data, target);
                     MessageTracker.UpdateMessageSentTime(target, message.MessageType, message.MessageNumber);
-                    Console.WriteLine($"[MessageDispatcher] Resending message: Type={message.MessageType}, Number={message.MessageNumber} to {target}");
+                    ConsoleMessages.Log($"[MessageDispatcher] Resending message: Type={message.MessageType}, Number={message.MessageNumber} to {target}");
                 }
             }
         }

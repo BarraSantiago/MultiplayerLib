@@ -42,7 +42,6 @@ public class ClientNetworkManager : AbstractNetworkManager
         ServerIPAddress = ip;
         Port = port;
         OnSendToServer += SendToServer;
-        _messageDispatcher.OnUpdatePing += UpdateServerPingTime;
         ClientMessageDispatcher.OnServerDisconnect += Dispose;
         _lastServerPingTime = Time.CurrentTime;
         try
@@ -58,11 +57,11 @@ public class ClientNetworkManager : AbstractNetworkManager
                 Color = color
             };
             SendToServer(playerData, MessageType.HandShake);
-            Console.WriteLine($"[ClientNetworkManager] Client started, connected to {ip}:{port}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Client started, connected to {ip}:{port}");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ClientNetworkManager] Failed to start client: {e.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Failed to start client: {e.Message}");
             throw;
         }
     }
@@ -73,14 +72,14 @@ public class ClientNetworkManager : AbstractNetworkManager
         {
             byte[] serializedData = SerializeMessage(data, messageType);
 
-            if (_connection != null)
-            {
-                _messageDispatcher.SendMessage(serializedData, messageType, _serverEndpoint, isImportant);
-            }
+            if (_connection == null) return;
+            
+            byte[] message = _messageDispatcher.ConvertToEnvelope(serializedData, messageType, _serverEndpoint, isImportant);
+            _connection.Send(message);
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ClientNetworkManager] SendToServer failed: {e.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] SendToServer failed: {e.Message}");
         }
     }
 
@@ -92,7 +91,7 @@ public class ClientNetworkManager : AbstractNetworkManager
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ClientNetworkManager] Send failed: {e.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Send failed: {e.Message}");
         }
     }
 
@@ -100,9 +99,10 @@ public class ClientNetworkManager : AbstractNetworkManager
     {
         try
         {
+            UpdateServerPingTime();
             MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
 
-            if (envelope.MessageType == MessageType.Ping)
+            if (!envelope.IsSortable && envelope.MessageType != MessageType.RequestResend)
             {
                 UpdateServerPingTime();
                 _messageDispatcher.TryDispatchMessage(data,envelope.MessageNumber, serverEndpoint);
@@ -113,6 +113,10 @@ public class ClientNetworkManager : AbstractNetworkManager
             {
                 HandleResendRequest(envelope.Data, serverEndpoint);
                 return;
+            }
+            if (envelope.IsImportant)
+            {
+                SendAcknowledgment(envelope.MessageType, envelope.MessageNumber, serverEndpoint);
             }
 
             bool inSequence = _messageSequenceTracker.CheckMessageSequence(ClientId, envelope.MessageType,
@@ -125,7 +129,7 @@ public class ClientNetworkManager : AbstractNetworkManager
 
                 if (missingNumbers.Count > 0)
                 {
-                    Console.WriteLine(
+                    ConsoleMessages.Log(
                         $"[ClientNetworkManager] Detected gap in message sequence for type {envelope.MessageType}. Missing: {string.Join(", ", missingNumbers)}");
                 }
             }
@@ -146,7 +150,7 @@ public class ClientNetworkManager : AbstractNetworkManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientNetworkManager] Error processing data: {ex.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Error processing data: {ex.Message}");
         }
     }
 
@@ -161,7 +165,7 @@ public class ClientNetworkManager : AbstractNetworkManager
             int count = BitConverter.ToInt32(data, offset);
             offset += 4;
 
-            Console.WriteLine(
+            ConsoleMessages.Log(
                 $"[ClientNetworkManager] Server requested resend of {count} messages of type {requestedType}");
 
             for (int i = 0; i < count; i++)
@@ -173,19 +177,19 @@ public class ClientNetworkManager : AbstractNetworkManager
                     messageDict.TryGetValue(messageNumber, out byte[] storedMessage))
                 {
                     SendMessage(storedMessage, serverEndpoint);
-                    Console.WriteLine(
+                    ConsoleMessages.Log(
                         $"[ClientNetworkManager] Resending message {messageNumber} of type {requestedType}");
                 }
                 else
                 {
-                    Console.WriteLine(
+                    ConsoleMessages.Log(
                         $"[ClientNetworkManager] Requested message {messageNumber} of type {requestedType} not found in cache");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientNetworkManager] Error handling resend request: {ex.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Error handling resend request: {ex.Message}");
         }
     }
 
@@ -202,7 +206,7 @@ public class ClientNetworkManager : AbstractNetworkManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientNetworkManager] Error storing sent message: {ex.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Error storing sent message: {ex.Message}");
             _connection.Send(data);
         }
     }
@@ -217,6 +221,17 @@ public class ClientNetworkManager : AbstractNetworkManager
         CleanupOldMessages();
     }
 
+    private void SendAcknowledgment(MessageType ackedType, int ackedNumber, IPEndPoint target)
+    {
+        AcknowledgeMessage ackMessage = new AcknowledgeMessage
+        {
+            MessageType = ackedType,
+            MessageNumber = ackedNumber
+        };
+
+        SendToServer(ackMessage, MessageType.Acknowledgment, false);
+    }
+    
     private void CleanupOldMessages()
     {
         const int MAX_MESSAGES_TO_KEEP = 100;
@@ -245,7 +260,7 @@ public class ClientNetworkManager : AbstractNetworkManager
         float currentTime = Time.CurrentTime;
         if (currentTime - _lastServerPingTime > ServerTimeout)
         {
-            Console.WriteLine(
+            ConsoleMessages.Log(
                 "[ClientNetworkManager] Server timeout detected. No ping received in the last 3 seconds.");
             Dispose();
         }
@@ -261,11 +276,11 @@ public class ClientNetworkManager : AbstractNetworkManager
             SendToServer(null, MessageType.Disconnect);
             ClientMessageDispatcher.OnSendToServer -= SendToServer;
 
-            Console.WriteLine("[ClientNetworkManager] Client disconnect notification sent");
+            ConsoleMessages.Log("[ClientNetworkManager] Client disconnect notification sent");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ClientNetworkManager] Disposal error: {e.Message}");
+            ConsoleMessages.Log($"[ClientNetworkManager] Disposal error: {e.Message}");
         }
 
         base.Dispose();

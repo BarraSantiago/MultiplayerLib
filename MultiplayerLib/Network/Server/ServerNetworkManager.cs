@@ -30,6 +30,7 @@ public class ServerNetworkManager : AbstractNetworkManager
             byte[] seedBytes = new byte[4];
             rng.GetBytes(seedBytes);
             SecuritySeed = BitConverter.ToInt32(seedBytes, 0);
+            SecuritySeed = Math.Abs(SecuritySeed);
         }
 
         OnSerializedBroadcast += SerializedBroadcast;
@@ -47,11 +48,11 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             _connection = new UdpConnection(port, this);
 
-            Console.WriteLine($"[ServerNetworkManager] Server started on port {port}");
+            ConsoleMessages.Log($"[ServerNetworkManager] Server started on port {port}");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ServerNetworkManager] Failed to start server: {e.Message}");
+            ConsoleMessages.Log($"[ServerNetworkManager] Failed to start server: {e.Message}");
             throw;
         }
     }
@@ -62,8 +63,13 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
             int clientId = GetClientId(ip);
+            
+            if (envelope.IsImportant && envelope.MessageType != MessageType.Acknowledgment)
+            {
+                SendAcknowledgment(clientId, envelope.MessageType, envelope.MessageNumber);
+            }
 
-            if (clientId == -1 || envelope.MessageType == MessageType.Ping)
+            if (!envelope.IsSortable)
             {
                 _messageDispatcher.TryDispatchMessage(data, envelope.MessageNumber, ip);
                 return;
@@ -106,10 +112,21 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NetworkManager] Error processing data from {ip}: {ex.Message}");
+            ConsoleMessages.Log($"[NetworkManager] Error processing data from {ip}: {ex.Message}");
         }
     }
 
+    private void SendAcknowledgment(int clientId, MessageType ackedType, int ackedNumber)
+    {
+        AcknowledgeMessage ackMessage = new AcknowledgeMessage
+        {
+            MessageType = ackedType,
+            MessageNumber = ackedNumber
+        };
+        
+        SendToClient(clientId, ackMessage, MessageType.Acknowledgment);
+    }
+    
     private void RequestResend(int clientId, MessageType messageType, List<int> missingNumbers)
     {
         if (!ClientManager.TryGetClient(clientId, out Client client)) return;
@@ -123,9 +140,10 @@ public class ServerNetworkManager : AbstractNetworkManager
             requestData.AddRange(BitConverter.GetBytes(number));
         }
 
-        _messageDispatcher.SendMessage(requestData.ToArray(), MessageType.RequestResend, client.ipEndPoint, true);
-
-        Console.WriteLine(
+        byte[] message = _messageDispatcher.ConvertToEnvelope(requestData.ToArray(), MessageType.RequestResend, client.ipEndPoint, true);
+        _connection.Send(message, client.ipEndPoint);
+        
+        ConsoleMessages.Log(
             $"[ServerNetworkManager] Requesting resend of {missingNumbers.Count} messages from client {clientId}");
     }
 
@@ -153,12 +171,12 @@ public class ServerNetworkManager : AbstractNetworkManager
             }
             else
             {
-                Console.WriteLine($"[ServerNetworkManager] Cannot send to client {clientId}: client not found");
+                ConsoleMessages.Log($"[ServerNetworkManager] Cannot send to client {clientId}: client not found");
             }
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ServerNetworkManager] SendToClient failed: {e.Message}");
+            ConsoleMessages.Log($"[ServerNetworkManager] SendToClient failed: {e.Message}");
         }
     }
 
@@ -179,7 +197,7 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ServerNetworkManager] Broadcast failed: {e.Message}");
+            ConsoleMessages.Log($"[ServerNetworkManager] Broadcast failed: {e.Message}");
         }
     }
 
@@ -193,7 +211,7 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ServerNetworkManager] Serialized broadcast failed: {e.Message}");
+            ConsoleMessages.Log($"[ServerNetworkManager] Serialized broadcast failed: {e.Message}");
         }
     }
 
@@ -245,12 +263,10 @@ public class ServerNetworkManager : AbstractNetworkManager
 
             if (playerPings.Count <= 0) return;
             SerializedBroadcast(playerPings.ToArray(), MessageType.PingBroadcast);
-
-            Console.WriteLine($"[ServerNetworkManager] Broadcasting ping data for {playerPings.Count} players");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ServerNetworkManager] Ping broadcast failed: {e.Message}");
+            ConsoleMessages.Log($"[ServerNetworkManager] Ping broadcast failed: {e.Message}");
         }
     }
 
@@ -280,7 +296,7 @@ public class ServerNetworkManager : AbstractNetworkManager
 
             if (!(currentTime - _lastClientActivityTime[clientId] > InactivityTimeout)) continue;
             clientsToRemove.Add(client.ipEndPoint);
-            Console.WriteLine($"[ServerNetworkManager] Client {clientId} disconnected due to inactivity");
+            ConsoleMessages.Log($"[ServerNetworkManager] Client {clientId} disconnected due to inactivity");
         }
 
         foreach (IPEndPoint ip in clientsToRemove)
@@ -301,7 +317,7 @@ public class ServerNetworkManager : AbstractNetworkManager
         try
         {
             SerializedBroadcast(null, MessageType.Disconnect);
-            Console.WriteLine("[ServerNetworkManager] Server shutdown notification sent");
+            ConsoleMessages.Log("[ServerNetworkManager] Server shutdown notification sent");
 
             OnSerializedBroadcast -= SerializedBroadcast;
             OnSendToClient -= SendToClient;
@@ -309,7 +325,7 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ServerNetworkManager] Disposal error: {e.Message}");
+            ConsoleMessages.Log($"[ServerNetworkManager] Disposal error: {e.Message}");
         }
 
         base.Dispose();

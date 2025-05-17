@@ -5,6 +5,7 @@ using MultiplayerLib.Network.ClientDir;
 using MultiplayerLib.Network.Factory;
 using MultiplayerLib.Network.interfaces;
 using MultiplayerLib.Network.Messages;
+using MultiplayerLib.Utils;
 
 namespace MultiplayerLib.Network.Server;
 
@@ -18,6 +19,8 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     private ClientManager _clientManager;
     private readonly Dictionary<int, int> _clientColor = new Dictionary<int, int>();
     public Action<int> OnNewClient;
+    private Dictionary<IPEndPoint, int> SequenceTracker = new();
+
     public ServerMessageDispatcher(ClientManager clientManager)
     {
         _clientManager = clientManager;
@@ -41,7 +44,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
     {
         if (!_clientManager.TryGetClientId(arg2, out int clientId))
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Disconnect from unknown client {arg2}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Disconnect from unknown client {arg2}");
             return;
         }
 
@@ -53,10 +56,9 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
     private void HandleAcknowledgment(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
-        MessageType ackedType = (MessageType)BitConverter.ToInt32(arg1, 0);
-        int ackedNumber = BitConverter.ToInt32(arg1, 4);
+        AcknowledgeMessage message = _netAcknowledge.Deserialize(arg1);
 
-        MessageTracker.ConfirmMessage(arg2, ackedType, ackedNumber);
+        MessageTracker.ConfirmMessage(arg2, message.MessageType, message.MessageNumber);
     }
 
 
@@ -82,11 +84,11 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             
             SendObjectsToClient(ip, networkObjects);
 
-            Console.WriteLine($"[ServerMessageDispatcher] New client {clientId} connected from {ip}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] New client {clientId} connected from {ip}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Error in HandleHandshake: {ex.Message}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Error in HandleHandshake: {ex.Message}");
         }
     }
     
@@ -124,7 +126,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Error in HandleConsoleMessage: {ex.Message}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Error in HandleConsoleMessage: {ex.Message}");
         }
     }
 
@@ -134,7 +136,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         {
             if (data == null)
             {
-                Console.WriteLine("[ServerMessageDispatcher] Invalid position data received");
+                ConsoleMessages.Log("[ServerMessageDispatcher] Invalid position data received");
                 return;
             }
 
@@ -142,7 +144,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
             if (!_clientManager.TryGetClientId(ip, out int clientId))
             {
-                Console.WriteLine($"[ServerMessageDispatcher] Position update from unknown client {ip}");
+                ConsoleMessages.Log($"[ServerMessageDispatcher] Position update from unknown client {ip}");
                 return;
             }
 
@@ -152,7 +154,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Error in HandlePositionUpdate: {ex.Message}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Error in HandlePositionUpdate: {ex.Message}");
         }
     }
 
@@ -164,16 +166,15 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         {
             if (!_clientManager.TryGetClientId(ip, out int clientId))
             {
-                Console.WriteLine($"[ServerMessageDispatcher] Ping from unknown client {ip}");
+                ConsoleMessages.Log($"[ServerMessageDispatcher] Ping from unknown client {ip}");
                 return;
             }
 
             _clientManager.UpdateClientTimestamp(clientId);
-            ServerNetworkManager.OnSendToClient.Invoke(clientId, null, MessageType.Ping, false);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Error in HandlePing: {ex.Message}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Error in HandlePing: {ex.Message}");
         }
     }
 
@@ -192,16 +193,18 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         throw new NotImplementedException();
     }
 
-    private Dictionary<IPEndPoint, int> SequenceTracker = new();
     private void HandlePlayerInput(byte[] arg1, int messageNum, IPEndPoint arg2)
     {
         try
         {
             if (arg1 == null)
             {
-                Console.WriteLine("[ServerMessageDispatcher] Invalid player input data received");
+                ConsoleMessages.Log("[ServerMessageDispatcher] Invalid player input data received");
                 return;
             }
+            
+            SequenceTracker.TryAdd(arg2, -1);
+            
             if(SequenceTracker[arg2] > messageNum)
             {
                 return;
@@ -211,7 +214,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
             if (!_clientManager.TryGetClientId(arg2, out int clientId))
             {
-                Console.WriteLine($"[ServerMessageDispatcher] Player input from unknown client {arg2}");
+                ConsoleMessages.Log($"[ServerMessageDispatcher] Player input from unknown client {arg2}");
                 return;
             }
 
@@ -240,7 +243,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Error in HandlePlayerInput: {ex.Message}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Error in HandlePlayerInput: {ex.Message}");
         }
     }
     
@@ -267,7 +270,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
         {
             if (envelope == null || ip == null)
             {
-                Console.WriteLine("[ServerMessageDispatcher] Null envelope or IP received");
+                ConsoleMessages.Log("[ServerMessageDispatcher] Null envelope or IP received");
                 return;
             }
 
@@ -276,7 +279,7 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
 
             if (_clientManager.TryGetClientId(ip, out int clientId))
             {
-                Console.WriteLine($"[ServerMessageDispatcher] Processing in-sequence message type {messageType} from client {clientId}");
+                ConsoleMessages.Log($"[ServerMessageDispatcher] Processing in-sequence message type {messageType} from client {clientId}");
             }
 
             if (_messageHandlers.TryGetValue(messageType, out var handler))
@@ -290,12 +293,12 @@ public abstract class ServerMessageDispatcher : BaseMessageDispatcher
             }
             else
             {
-                Console.WriteLine($"[ServerMessageDispatcher] No handler registered for message type {messageType}");
+                ConsoleMessages.Log($"[ServerMessageDispatcher] No handler registered for message type {messageType}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ServerMessageDispatcher] Error handling message data from {ip}: {ex.Message}");
+            ConsoleMessages.Log($"[ServerMessageDispatcher] Error handling message data from {ip}: {ex.Message}");
         }
     }
 }

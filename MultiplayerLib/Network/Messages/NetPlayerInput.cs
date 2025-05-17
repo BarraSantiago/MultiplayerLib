@@ -14,8 +14,7 @@ public class NetPlayerInput : IMessage<PlayerInput>
     public byte[] Serialize()
     {
         List<byte> message = new List<byte>();
-        message.AddRange(BitConverter.GetBytes(PlayerInputData.MoveDirection.X));
-        message.AddRange(BitConverter.GetBytes(PlayerInputData.MoveDirection.Y));
+        message.AddRange(BitConverter.GetBytes(PlayerInputData.xMovement));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsJumping));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsShooting));
         message.AddRange(BitConverter.GetBytes(PlayerInputData.IsCrouching));
@@ -29,9 +28,7 @@ public class NetPlayerInput : IMessage<PlayerInput>
         PlayerInput inputData = new PlayerInput();
         int offset = 0;
 
-        inputData.MoveDirection.X = BitConverter.ToSingle(message, offset);
-        offset += 4;
-        inputData.MoveDirection.Y = BitConverter.ToSingle(message, offset);
+        inputData.xMovement = BitConverter.ToSingle(message, offset);
         offset += 4;
         inputData.IsJumping = BitConverter.ToBoolean(message, offset);
         offset += 1;
@@ -45,8 +42,7 @@ public class NetPlayerInput : IMessage<PlayerInput>
     public byte[] Serialize(PlayerInput inputData)
     {
         List<byte> message = new List<byte>();
-        message.AddRange(BitConverter.GetBytes(inputData.MoveDirection.X));
-        message.AddRange(BitConverter.GetBytes(inputData.MoveDirection.Y));
+        message.AddRange(BitConverter.GetBytes(inputData.xMovement));
         message.AddRange(BitConverter.GetBytes(inputData.IsJumping));
         message.AddRange(BitConverter.GetBytes(inputData.IsShooting));
         message.AddRange(BitConverter.GetBytes(inputData.IsCrouching));

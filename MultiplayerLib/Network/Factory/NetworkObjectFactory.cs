@@ -92,7 +92,7 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
 
         if (_networkObjects.ContainsKey(createMsg.NetworkId))
         {
-            Console.WriteLine($"[NetworkObjectFactory] Object with ID {createMsg.NetworkId} already exists.");
+            ConsoleMessages.Log($"[NetworkObjectFactory] Object with ID {createMsg.NetworkId} already exists.");
             return;
         }
 
@@ -117,7 +117,7 @@ public abstract class NetworkObjectFactory : Singleton<NetworkObjectFactory>
         }
         else
         {
-            Console.WriteLine($"[NetworkObjectFactory] Network object with ID {clientId} not found.");
+            ConsoleMessages.Log($"[NetworkObjectFactory] Network object with ID {clientId} not found.");
         }
     }
 

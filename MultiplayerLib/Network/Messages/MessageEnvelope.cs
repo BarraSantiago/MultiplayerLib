@@ -9,13 +9,15 @@ public class MessageEnvelope
     public MessageType MessageType { get; set; }
     public int MessageNumber { get; set; }
     public bool IsImportant { get; set; }
+    public bool IsSortable { get; set; }
+
     public byte[] Data { get; set; }
 
     public int Checksum1 { get; private set; }
     public int Checksum2 { get; private set; }
-    
+
     private static int _securitySeed = 0;
-    
+
     public static void SetSecuritySeed(int seed)
     {
         _securitySeed = seed;
@@ -28,6 +30,8 @@ public class MessageEnvelope
         result.AddRange(BitConverter.GetBytes((int)MessageType));
         result.AddRange(BitConverter.GetBytes(MessageNumber));
         result.Add(BitConverter.GetBytes(IsImportant ? 1 : 0)[0]);
+        result.Add(BitConverter.GetBytes(IsSortable ? 1 : 0)[0]); // Add new flag
+
 
         if (Data != null)
         {
@@ -60,7 +64,10 @@ public class MessageEnvelope
 
         envelope.IsImportant = data[offset] == 1;
         offset += 1;
-
+        
+        envelope.IsSortable = data[offset] == 1;
+        offset += 1;
+        
         int dataLength = data.Length - offset - 8;
 
         if (dataLength > 0)
@@ -80,7 +87,7 @@ public class MessageEnvelope
         envelope.Checksum2 = BitConverter.ToInt32(data, offset);
 
         int calculatedChecksum1, calculatedChecksum2;
-        envelope.CalculateChecksums(out calculatedChecksum1, out calculatedChecksum2);
+        envelope.CalculateChecksums(out calculatedChecksum1, out calculatedChecksum2, _securitySeed);
 
         if (calculatedChecksum1 != envelope.Checksum1 || calculatedChecksum2 != envelope.Checksum2)
             throw new Exception("Checksum verification failed");
@@ -89,26 +96,35 @@ public class MessageEnvelope
     }
 
 
-    private void CalculateChecksums(out int checksum1, out int checksum2, int seed = 0)
+    private void CalculateChecksums(out int checksum1, out int checksum2, int seed)
     {
-        int[][] operations = {
-            new int[] { 0, 1, 2, 3, 4 }, 
-            new int[] { 4, 3, 2, 1, 0 }, 
-            new int[] { 2, 0, 3, 1, 4 }, 
-            new int[] { 1, 4, 0, 2, 3 }, 
-            new int[] { 3, 2, 4, 0, 1 } 
+        int[][] operations =
+        {
+            new int[] { 0, 1, 2, 3, 4 },
+            new int[] { 4, 3, 2, 1, 0 },
+            new int[] { 2, 0, 3, 1, 4 },
+            new int[] { 1, 4, 0, 2, 3 },
+            new int[] { 3, 2, 4, 0, 1 }
         };
-        
+
         uint uChecksum1 = 0;
         uint uChecksum2 = 0x12345678;
 
-        byte[] headerData = new byte[10];
+        byte[] headerData = new byte[11];
         headerData[0] = (byte)(IsCritical ? 1 : 0);
         Array.Copy(BitConverter.GetBytes((int)MessageType), 0, headerData, 1, 4);
         Array.Copy(BitConverter.GetBytes(MessageNumber), 0, headerData, 5, 4);
         headerData[9] = (byte)(IsImportant ? 1 : 0);
+        headerData[10] = (byte)(IsSortable ? 1 : 0);
 
+        if(MessageType == MessageType.HandShake || MessageType == MessageType.HandShakeResponse)
+        {
+            seed = 0;
+        }
+        seed = 0;
+        
         ProcessBytes(headerData, ref uChecksum1, ref uChecksum2, operations[seed % operations.Length], 0);
+        
         if (Data != null)
         {
             ProcessBytes(Data, ref uChecksum1, ref uChecksum2, operations[seed % operations.Length], headerData.Length);
@@ -123,9 +139,19 @@ public class MessageEnvelope
 
     private void ProcessBytes(byte[] data, ref uint uChecksum1, ref uint uChecksum2, int[] operations, int offset)
     {
+        if (data == null || data.Length == 0 || operations == null || operations.Length == 0)
+        {
+            return;
+        }
+
         for (int i = 0; i < data.Length; i++)
         {
             int opIndex = (i + offset) % operations.Length;
+
+            if (opIndex < 0 || opIndex >= operations.Length)
+            {
+                continue; 
+            }
 
             switch (operations[opIndex])
             {
@@ -144,7 +170,7 @@ public class MessageEnvelope
                     uChecksum2 |= (uint)(data[i] << ((i + 5) % 8));
                     break;
 
-                case 3: 
+                case 3:
                     uChecksum1 &= 0xFFFFFFFF - (uint)data[i];
                     uChecksum2 &= 0xFFFFFFFF - (uint)(data[i] << 2);
                     break;
@@ -158,13 +184,14 @@ public class MessageEnvelope
             }
         }
     }
+
     private void CalculateChecksums()
     {
         CalculateChecksums(out int checksum1, out int checksum2, _securitySeed);
         Checksum1 = checksum1;
         Checksum2 = checksum2;
     }
-    
+
     // Update the encryption methods to use the seed
     private byte[] EncryptData(byte[] data)
     {
