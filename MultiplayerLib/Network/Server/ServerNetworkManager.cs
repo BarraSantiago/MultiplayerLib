@@ -19,10 +19,11 @@ public class ServerNetworkManager : AbstractNetworkManager
     public float PingBroadcastInterval = 0.50f;
     public float InactivityTimeout = 15f;
     public int TimeOut = 30;
-    public ClientManager ClientManager;
+    public ClientManager ClientManager = new ClientManager();
     private Dictionary<int, float> _lastClientActivityTime = new Dictionary<int, float>();
+    private Action<int> _onNewClient;
 
-    public void Init()
+    public void Init(ref Action<int> OnNewClient)
     {
         using (RandomNumberGenerator? rng = RandomNumberGenerator.Create())
         {
@@ -30,12 +31,12 @@ public class ServerNetworkManager : AbstractNetworkManager
             rng.GetBytes(seedBytes);
             SecuritySeed = BitConverter.ToInt32(seedBytes, 0);
         }
-        ClientManager = new ClientManager();
+
         OnSerializedBroadcast += SerializedBroadcast;
         OnSendToClient += SendToClient;
         MessageEnvelope.SetSecuritySeed(SecuritySeed);
-        ServerMessageDispatcher dispatcher = _messageDispatcher as ServerMessageDispatcher;
-        dispatcher.OnNewClient += RegisterNewClient;
+        _onNewClient = OnNewClient;
+        _onNewClient += RegisterNewClient;
     }
 
     public void StartServer(int port)
@@ -55,40 +56,40 @@ public class ServerNetworkManager : AbstractNetworkManager
         }
     }
 
-   public override void OnReceiveData(byte[] data, IPEndPoint ip)
-   {
+    public override void OnReceiveData(byte[] data, IPEndPoint ip)
+    {
         try
         {
             MessageEnvelope envelope = MessageEnvelope.Deserialize(data);
             int clientId = GetClientId(ip);
-            
+
             if (clientId == -1 || envelope.MessageType == MessageType.Ping)
             {
                 _messageDispatcher.TryDispatchMessage(data, envelope.MessageNumber, ip);
                 return;
             }
-            
+
             bool inSequence = _messageSequenceTracker.CheckMessageSequence(
-                clientId, 
-                envelope.MessageType, 
-                envelope.MessageNumber, 
-                envelope.Data, 
+                clientId,
+                envelope.MessageType,
+                envelope.MessageNumber,
+                envelope.Data,
                 out List<byte[]> messagesToProcess);
-                
+
             if (!inSequence)
             {
                 if (envelope.IsImportant)
                 {
                     List<int> missingNumbers = _messageSequenceTracker.GetMissingMessageNumbers(
                         clientId, envelope.MessageType);
-                    
+
                     if (missingNumbers.Count > 0)
                         RequestResend(clientId, envelope.MessageType, missingNumbers);
                 }
-                
+
                 return;
             }
-            
+
             foreach (byte[] messageData in messagesToProcess)
             {
                 MessageEnvelope dataEnvelope = new MessageEnvelope
@@ -96,7 +97,7 @@ public class ServerNetworkManager : AbstractNetworkManager
                     MessageType = envelope.MessageType,
                     Data = messageData
                 };
-                
+
                 if (_messageDispatcher is ServerMessageDispatcher serverDispatcher)
                 {
                     serverDispatcher.HandleMessageData(dataEnvelope, ip);
@@ -108,11 +109,11 @@ public class ServerNetworkManager : AbstractNetworkManager
             Console.WriteLine($"[NetworkManager] Error processing data from {ip}: {ex.Message}");
         }
     }
-    
+
     private void RequestResend(int clientId, MessageType messageType, List<int> missingNumbers)
     {
         if (!ClientManager.TryGetClient(clientId, out Client client)) return;
-            
+
         List<byte> requestData = new List<byte>();
         requestData.AddRange(BitConverter.GetBytes((int)messageType));
         requestData.AddRange(BitConverter.GetBytes(missingNumbers.Count));
@@ -121,12 +122,13 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             requestData.AddRange(BitConverter.GetBytes(number));
         }
-            
+
         _messageDispatcher.SendMessage(requestData.ToArray(), MessageType.RequestResend, client.ipEndPoint, true);
-            
-        Console.WriteLine($"[ServerNetworkManager] Requesting resend of {missingNumbers.Count} messages from client {clientId}");
+
+        Console.WriteLine(
+            $"[ServerNetworkManager] Requesting resend of {missingNumbers.Count} messages from client {clientId}");
     }
-    
+
     public void RegisterNewClient(int clientId)
     {
         _messageSequenceTracker.InitializeClient(clientId);
@@ -285,10 +287,10 @@ public class ServerNetworkManager : AbstractNetworkManager
         {
             if (!ClientManager.TryGetClientId(ip, out int clientId)) continue;
             _lastClientActivityTime.Remove(clientId);
-            _messageSequenceTracker.RemoveClient(clientId); // Add this line
-            
+            _messageSequenceTracker.RemoveClient(clientId);
+
             ServerMessageDispatcher? serverDispatcher = _messageDispatcher as ServerMessageDispatcher;
-            serverDispatcher?.HandleDisconnect(Array.Empty<byte>(), ip);
+            serverDispatcher?.HandleDisconnect(Array.Empty<byte>(), 0, ip);
         }
     }
 
@@ -303,6 +305,7 @@ public class ServerNetworkManager : AbstractNetworkManager
 
             OnSerializedBroadcast -= SerializedBroadcast;
             OnSendToClient -= SendToClient;
+            _onNewClient -= RegisterNewClient;
         }
         catch (Exception e)
         {

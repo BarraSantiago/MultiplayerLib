@@ -74,7 +74,9 @@ public class ClientNetworkManager : AbstractNetworkManager
             byte[] serializedData = SerializeMessage(data, messageType);
 
             if (_connection != null)
+            {
                 _messageDispatcher.SendMessage(serializedData, messageType, _serverEndpoint, isImportant);
+            }
         }
         catch (Exception e)
         {
@@ -196,13 +198,12 @@ public class ClientNetworkManager : AbstractNetworkManager
             {
                 _sentMessages[envelope.MessageType][envelope.MessageNumber] = data;
             }
-
-            base.SendMessage(data, target);
+            _connection.Send(data);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ClientNetworkManager] Error storing sent message: {ex.Message}");
-            base.SendMessage(data, target);
+            _connection.Send(data);
         }
     }
 
